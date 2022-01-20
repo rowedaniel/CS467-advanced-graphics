@@ -43,15 +43,19 @@ int main(int argc, char *argv[])
 		G_rgb(0, 0, 0);
 		G_clear();
 
-		G_rgb(color[0], color[1], color[2]);
-		G_fill_circle(centerx, centery, rad);
-		rad += growth;
-		color[1] += 1.0 / framecount;
+		color[1] = i * 1.0/framecount;
+		rad = 10 + i * growth;
+		for(int j = i; j > 0; --j) {
+			G_rgb(color[0], color[1], color[2]);
+			G_fill_circle(centerx, centery, rad);
+			rad -= growth;
+			color[1] -= 1.0 / framecount;
+		}
 
+		G_display_image();
 		sprintf(filename, "growingsun%04d.xwd", i);
 		G_save_image_to_file(filename);
 
-		G_wait_key();
 	}
 
 
