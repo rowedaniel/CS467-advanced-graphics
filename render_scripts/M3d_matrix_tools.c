@@ -257,7 +257,7 @@ int M3d_x_product (double res[3], double a[3], double b[3])
 int M3d_print_vector(double a[3])
 {
 	for(int i=0; i<3; i++) {
-		printf("%lf", a[i]);
+		printf("%lf ", a[i]);
 	}
 	printf("\n");
 }
@@ -340,21 +340,21 @@ int M3d_make_movement_sequence_matrix(double v[4][4], double vi[4][4],
 
 		case(RX):
 			{
-			double angle = mparam[i] * M_PI/180.0;
+			double angle = mparam[i]; // for degrees instead of rad: // * M_PI/180.0;
 			M3d_make_x_rotation_cs(ftmp, cos(angle), sin(angle));
 			M3d_make_x_rotation_cs(btmp, cos(-angle), sin(-angle));
 			break;
 			}
 		case(RY):
 			{
-			double angle = mparam[i] * M_PI/180.0;
+			double angle = mparam[i]; // for degrees instead of rad: // * M_PI/180.0;
 			M3d_make_y_rotation_cs(ftmp, cos(angle), sin(angle));
 			M3d_make_y_rotation_cs(btmp, cos(-angle), sin(-angle));
 			break;
 			}
 		case(RZ):
 			{
-			double angle = mparam[i] * M_PI/180.0;
+			double angle = mparam[i]; // for degrees instead of rad: // * M_PI/180.0;
 			M3d_make_z_rotation_cs(ftmp, cos(angle), sin(angle));
 			M3d_make_z_rotation_cs(btmp, cos(-angle), sin(-angle));
 			break;
@@ -391,3 +391,55 @@ int M3d_make_movement_sequence_matrix(double v[4][4], double vi[4][4],
 	}
 }
   
+
+
+int M3d_view(double v[4][4], double vi[4][4],  double eyeA[3], double coiA[3], double upA[3])
+{
+
+ int i = 0;
+ int mtype[100] ;
+ double mparam[100] ;
+
+ double new_coiA[3], new_upA[3];
+
+ // translate eye to origin
+ mtype[i] = TX ;  mparam[i] =  -eyeA[0]                         ; i++ ;
+ mtype[i] = TY ;  mparam[i] =  -eyeA[1]                         ; i++ ;
+ mtype[i] = TZ ;  mparam[i] =  -eyeA[2]                         ; i++ ;
+
+ 
+
+
+ // rotate center of interest to go along z-axis
+ 
+ // update new_coiA to reflect its new position
+ M3d_make_movement_sequence_matrix(v,vi,  i,mtype,mparam) ;
+ M3d_mat_mult_pt(new_coiA, v, coiA);
+
+ // add new transformation (make coiA[1]=0)
+ mtype[i] = RX ;  mparam[i] =  atan2(new_coiA[1], new_coiA[2])  ; i++ ;
+
+ // update new_coiA to reflect its new position
+ M3d_make_movement_sequence_matrix(v,vi,  i,mtype,mparam) ;
+ M3d_mat_mult_pt(new_coiA, v, coiA);
+ // add new transformation (make coiA[0]=0)
+ mtype[i] = RY ;  mparam[i] =  -atan2(new_coiA[0], new_coiA[2]) ; i++ ;
+
+
+
+
+
+
+ // rotate up vector to point along y-axis
+ 
+ // transform new_upA to reflect its new position
+ M3d_make_movement_sequence_matrix(v,vi,  i,mtype,mparam) ;
+ M3d_mat_mult_pt(new_upA, v, upA);
+
+ // add new transformation to put up vector where it's supposed to be 
+ mtype[i] = RZ ;  mparam[i] =  atan2(new_upA[0], new_upA[1])    ; i++ ;
+ M3d_make_movement_sequence_matrix(v,vi,  i,mtype,mparam) ;
+ /*
+ */
+
+}

@@ -35,11 +35,16 @@ int main(int argc, char **argv)
 
  // .....
 
+
+ const double rotspeed = 2.0;
+ const double scalespeed = 0.95;
+
  double v[4][4], vi[4][4];
  int i ;
  int mtype[100] ;
  double mparam[100] ;
 
+ // rescale stick-figure to match the screensize
  i = 0 ;
  mtype[i] = TX ;  mparam[i] =  -200      ; i++ ;
  mtype[i] = TY ;  mparam[i] =  -200      ; i++ ;
@@ -49,20 +54,16 @@ int main(int argc, char **argv)
  mtype[i] = TY ;  mparam[i] =  winsize / 2.0   ; i++ ;
 
  M3d_make_movement_sequence_matrix(v,vi,  i,mtype,mparam) ;
-
  M3d_mat_mult_points(x, y, z, v, x, y, z, n);
 
- printf("1st mat:\n");
- M3d_print_mat(v);
- 
- // now make the movie the rotates and shrinks about the center :
 
+ // now make the movie the rotates and shrinks about the center :
  i = 0 ;
  mtype[i] = TX ;  mparam[i] =  -winsize/2.0 ; i++ ;
  mtype[i] = TY ;  mparam[i] =  -winsize/2.0 ; i++ ;
- mtype[i] = RZ ;  mparam[i] =        1.0    ; i++ ;
- mtype[i] = SX ;  mparam[i] =        0.98   ; i++ ;
- mtype[i] = SY ;  mparam[i] =        0.98   ; i++ ;
+ mtype[i] = RZ ;  mparam[i] =  rotspeed     ; i++ ;
+ mtype[i] = SX ;  mparam[i] =  scalespeed   ; i++ ;
+ mtype[i] = SY ;  mparam[i] =  scalespeed   ; i++ ;
  mtype[i] = TX ;  mparam[i] =  winsize/2.0  ; i++ ;
  mtype[i] = TY ;  mparam[i] =  winsize/2.0  ; i++ ;
 
@@ -81,7 +82,7 @@ int main(int argc, char **argv)
  
 
  printf("frametime: %lf\n", u);
- for(i=0; i<360*3; ++i) { 
+ for(i=0; i < (360/rotspeed); ++i) { 
 
    G_rgb(0,0,0);
    G_clear();

@@ -1,0 +1,68 @@
+
+Empty 3d graph (for copying purposes only):
+     y
+     |
+     |
+     |
+     |
+     |
+     |
+     |
+     +---------z
+    /
+   /
+  /
+ /
+x
+
+
+
+
+
+
+Object Space:
+     y
+     |
+     |
+     |
+     |
+    -+-
+   / | \
+  /  |  \
+ +   +---+-----z
+  \ /   /
+   +   / 
+  / \--
+ /
+x
+  - object centered at 0,0,0
+  - just that object
+
+
+World Space:
+     y
+     |   /---\
+     |  |     |
+     |   \   /
+     |    | |
+     |    | |
+     |    | |
+     |    +-+
+     +---------z
+    /
+   /
+  /
+ /
+x
+  - multiple objects
+  - centered wherever you like
+
+
+
+Eye (camera) stuff:
+  - the eye is defined by:
+      - point location (eyeA[3])
+      - vector view direction (coiA[3])
+      - up vector (upA[3])
+  - the transformation to move the eye to eyeA=0,0,0, coiA=0,0,1, upA=0,1,0 is called the "view matrix"
+      - multiply all objects by view matrix to take picture

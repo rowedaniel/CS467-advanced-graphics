@@ -18,6 +18,7 @@ int main()
   printf("\n") ;
   M3d_print_mat(vi) ;	     
 
+
   printf("\nTest2 :\n") ;  
   double eyeB[3] = {10,-20,15} ;
   double coiB[3] = {14,26,22} ;
