@@ -464,11 +464,18 @@ int main ()
   //---------------------------------------------------------------------
 
   double eye[3], coi[3], up[3] ;
+  double v[4][4], vi[4][4];
+  int i;
 
   int fnum ;
   double t ;
 
   fnum = 0 ;
+
+
+
+
+
 
   while (1) {
 
@@ -488,7 +495,35 @@ int main ()
     up[1]  = eye[1] + 1 ;
     up[2]  = eye[2] ; 
 
-    // put your code here!!!!!!!!!!!!
+    //------------------------------- put your code here!!!!!!!!!!!!
+
+    // view the screen
+    G_rgb(0,0,0);
+    G_clear();
+    printf("rendering frame %d\n", fnum);
+    // render
+
+    M3d_view(v,vi, eye, coi, up);
+
+    for (i = 0 ; i < onum ; i++) {
+      M3d_mat_mult_points(x[i], y[i], z[i],
+		          v,
+			  x[i], y[i], z[i], numpoints[i]);
+    }
+
+    draw_all_objects();
+    G_wait_key();
+
+    for (i = 0 ; i < onum ; i++) {
+      M3d_mat_mult_points(x[i], y[i], z[i],
+		          vi,
+			  x[i], y[i], z[i], numpoints[i]);
+    }
+
+
+
+
+
 
 
     fnum++ ;
