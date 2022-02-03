@@ -340,21 +340,21 @@ int M3d_make_movement_sequence_matrix(double v[4][4], double vi[4][4],
 
 		case(RX):
 			{
-			double angle = mparam[i]; // for degrees instead of rad: // * M_PI/180.0;
+			double angle = mparam[i] * M_PI/180.0;
 			M3d_make_x_rotation_cs(ftmp, cos(angle), sin(angle));
 			M3d_make_x_rotation_cs(btmp, cos(-angle), sin(-angle));
 			break;
 			}
 		case(RY):
 			{
-			double angle = mparam[i]; // for degrees instead of rad: // * M_PI/180.0;
+			double angle = mparam[i] * M_PI/180.0;
 			M3d_make_y_rotation_cs(ftmp, cos(angle), sin(angle));
 			M3d_make_y_rotation_cs(btmp, cos(-angle), sin(-angle));
 			break;
 			}
 		case(RZ):
 			{
-			double angle = mparam[i]; // for degrees instead of rad: // * M_PI/180.0;
+			double angle = mparam[i] * M_PI/180.0;
 			M3d_make_z_rotation_cs(ftmp, cos(angle), sin(angle));
 			M3d_make_z_rotation_cs(btmp, cos(-angle), sin(-angle));
 			break;
@@ -417,13 +417,13 @@ int M3d_view(double v[4][4], double vi[4][4],  double eyeA[3], double coiA[3], d
  M3d_mat_mult_pt(new_coiA, v, coiA);
 
  // add new transformation (make coiA[1]=0)
- mtype[i] = RX ;  mparam[i] =  atan2(new_coiA[1], new_coiA[2])  ; i++ ;
+ mtype[i] = RX ;  mparam[i] =  atan2(new_coiA[1], new_coiA[2])*180/M_PI  ; i++ ;
 
  // update new_coiA to reflect its new position
  M3d_make_movement_sequence_matrix(v,vi,  i,mtype,mparam) ;
  M3d_mat_mult_pt(new_coiA, v, coiA);
  // add new transformation (make coiA[0]=0)
- mtype[i] = RY ;  mparam[i] =  -atan2(new_coiA[0], new_coiA[2]) ; i++ ;
+ mtype[i] = RY ;  mparam[i] =  -atan2(new_coiA[0], new_coiA[2])*180/M_PI ; i++ ;
 
 
 
@@ -437,7 +437,7 @@ int M3d_view(double v[4][4], double vi[4][4],  double eyeA[3], double coiA[3], d
  M3d_mat_mult_pt(new_upA, v, upA);
 
  // add new transformation to put up vector where it's supposed to be 
- mtype[i] = RZ ;  mparam[i] =  atan2(new_upA[0], new_upA[1])    ; i++ ;
+ mtype[i] = RZ ;  mparam[i] =  atan2(new_upA[0], new_upA[1])*180/M_PI    ; i++ ;
  M3d_make_movement_sequence_matrix(v,vi,  i,mtype,mparam) ;
  /*
  */
