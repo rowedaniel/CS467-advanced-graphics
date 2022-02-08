@@ -179,7 +179,7 @@ int main()
 		make_graph(x, y, n,
 			   0, 2*M_PI,
 			   &X, &Y);
-		G_rgb(0,1,0);
+		G_rgb(0.4,0.4,0);
 		M3d_mat_mult_points(x, y, z,
 			          T,
 			  	  x, y, z, n);	  
@@ -202,12 +202,12 @@ int main()
 	// Graph the entire curve.
 	{
 		M3d_make_movement_sequence_matrix(T, Ti,   Tn,Ttypelist, Tvlist);
-		double X(double u) { return sgn(cos(u)) * cos(u)*cos(u); }
-		double Y(double u) { return sgn(sin(u)) * sin(u)*sin(u); }
+		double X(double u) { return sgn(cos(u)) * pow(cos(u), 4); }
+		double Y(double u) { return sgn(sin(u)) * pow(sin(u), 4); }
 		make_graph(x, y, n,
 			   0, 2*M_PI,
 			   &X, &Y);
-		G_rgb(0,1,0);
+		G_rgb(0.2,0,0.5);
 		M3d_mat_mult_points(x, y, z,
 			          T,
 			  	  x, y, z, n);	  
@@ -227,6 +227,19 @@ int main()
 	Ttypelist[Tn] = TX ; Tvlist[Tn] =  250.0 ; Tn++ ;
 	Ttypelist[Tn] = TY ; Tvlist[Tn] =  150.0 ; Tn++ ;
 	// Graph only the part with u in [-1, 1.5]  
+	{
+		M3d_make_movement_sequence_matrix(T, Ti,   Tn,Ttypelist, Tvlist);
+		double X(double u) { return cosh(u); }
+		double Y(double u) { return sinh(u); }
+		make_graph(x, y, n,
+			   -1, 1.5,
+			   &X, &Y);
+		G_rgb(0,1,0.5);
+		M3d_mat_mult_points(x, y, z,
+			          T,
+			  	  x, y, z, n);	  
+		draw_graph(x, y, n);
+	}
 	
 	
 	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -242,6 +255,19 @@ int main()
 	Ttypelist[Tn] = TX ; Tvlist[Tn] =  140.0 ; Tn++ ;
 	Ttypelist[Tn] = TY ; Tvlist[Tn] =  200.0 ; Tn++ ;
 	// Graph only the part with u in [-1, 2]
+	{
+		M3d_make_movement_sequence_matrix(T, Ti,   Tn,Ttypelist, Tvlist);
+		double X(double u) { return u; }
+		double Y(double u) { return u*u; }
+		make_graph(x, y, n,
+			   -1, 2,
+			   &X, &Y);
+		G_rgb(0.5,0.8,0.9);
+		M3d_mat_mult_points(x, y, z,
+			          T,
+			  	  x, y, z, n);	  
+		draw_graph(x, y, n);
+	}
 	
 	
 	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -257,8 +283,43 @@ int main()
 	Ttypelist[Tn] = TX ; Tvlist[Tn] =  620.0 ; Tn++ ;
 	Ttypelist[Tn] = TY ; Tvlist[Tn] =  210.0 ; Tn++ ;
 	// Graph the entire curve.
+	{
+		M3d_make_movement_sequence_matrix(T, Ti,   Tn,Ttypelist, Tvlist);
+		double X(double u) { return pow(cos(u), 3); }
+		double Y(double u) { return sin(u); }
+		make_graph(x, y, n,
+			   0, 2*M_PI,
+			   &X, &Y);
+		G_rgb(0.5,0.2,0.2);
+		M3d_mat_mult_points(x, y, z,
+			          T,
+			  	  x, y, z, n);	  
+		draw_graph(x, y, n);
+	}
 	
 
+	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	// curvething :
+	//   x = t-sin(t), y=-cos(t) ;
+	Tn = 0 ; 
+	Ttypelist[Tn] = SX ; Tvlist[Tn] =  20.0  ; Tn++ ;
+	Ttypelist[Tn] = SY ; Tvlist[Tn] =  20.0 ; Tn++ ;
+	Ttypelist[Tn] = TX ; Tvlist[Tn] =  100.0 ; Tn++ ;
+	Ttypelist[Tn] = TY ; Tvlist[Tn] =   30.0 ; Tn++ ;
+	// Graph the curve in [0, 6*M_PI].
+	{
+		M3d_make_movement_sequence_matrix(T, Ti,   Tn,Ttypelist, Tvlist);
+		double X(double u) { return u-sin(u); }
+		double Y(double u) { return -cos(u); }
+		make_graph(x, y, n,
+			   0, 6*M_PI,
+			   &X, &Y);
+		G_rgb(1,1,1);
+		M3d_mat_mult_points(x, y, z,
+			          T,
+			  	  x, y, z, n);	  
+		draw_graph(x, y, n);
+	}
 
 
 
