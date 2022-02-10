@@ -310,7 +310,7 @@ int main()
 	{
 		M3d_make_movement_sequence_matrix(T, Ti,   Tn,Ttypelist, Tvlist);
 		double X(double u) { return u-sin(u); }
-		double Y(double u) { return -cos(u); }
+		double Y(double u) { return 1-cos(u); }
 		make_graph(x, y, n,
 			   0, 6*M_PI,
 			   &X, &Y);
