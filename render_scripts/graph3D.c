@@ -248,6 +248,7 @@ int make_graph_step(double ustart, double uend, double ustep,
 
 			// next, do the lightmodel
 			double new_rgb[3];
+			/*
 			double P2[3] = {X(u+ustep,v), Y(u+ustep,v), Z(u+ustep,v)};
 			double P3[3] = {X(u,v+vstep), Y(u,v+vstep), Z(u,v+vstep)};
 			// transform points to camera-space
@@ -255,6 +256,38 @@ int make_graph_step(double ustart, double uend, double ustep,
 			M3d_mat_mult_pt(P3, T, P3);
 			// do light model
 			light_model(inherent_rgb, P, P2, P3, new_rgb);
+			*/
+
+			double eye[3] = {0, 0, 0};
+			double P2[3] = {X(u+ustep,v), Y(u+ustep,v), Z(u+ustep,v)};
+			double P3[3] = {X(u,v+vstep), Y(u,v+vstep), Z(u,v+vstep)};
+			// transform points to camera-space
+			M3d_mat_mult_pt(P2, T, P2);
+			M3d_mat_mult_pt(P3, T, P3);
+
+			// subtract P2-P, P3-P to get vectors, not points
+			M3d_vector_mult_const(P2, P2, -1);
+			M3d_vector_add(P2, P2, P);
+			M3d_vector_mult_const(P2, P2, -1);
+			
+			M3d_vector_mult_const(P3, P3, -1);
+			M3d_vector_add(P3, P3, P);
+			M3d_vector_mult_const(P3, P3, -1);
+
+			double N[3];
+			M3d_x_product(N, P2, P3);
+
+			/*
+			printf("P:\n");
+			M3d_print_vector(P);
+			printf("N:\n");
+			M3d_print_vector(P);
+			*/
+
+			Light_Model(inherent_rgb, eye, P, N, new_rgb);
+
+
+
 			G_rgb(new_rgb[0], new_rgb[1], new_rgb[2]);
 			//G_rgb(inherent_rgb[0], inherent_rgb[1], inherent_rgb[2]);
 

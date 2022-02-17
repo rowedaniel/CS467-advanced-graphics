@@ -272,7 +272,7 @@ double M3d_magnitude(double a[3]) {
 
 int M3d_vector_mult_const(double res[3], double a[3], double b) {
 	for(int i=0; i<3; ++i) {
-		res[i] = a[i]+b;
+		res[i] = a[i]*b;
 	}
 }
 
