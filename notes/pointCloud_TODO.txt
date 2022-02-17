@@ -1,0 +1,6 @@
+1. performance
+  - better (earlier) checks to not render extra stuff
+  - use varying point density to account for du/dA and dv/dA (dA = area deformation)
+2. quality
+  - make inherent_rgb vary based on object.
+  - i.e. map u,v to points on an image, and then make that the corresponding color on the shape.
