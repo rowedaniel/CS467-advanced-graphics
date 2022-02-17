@@ -26,7 +26,8 @@ void draw_all_objects(double V[4][4], double T[M][4][4],
 
   for(int onum = 0; onum < numobjects; ++onum) {
     // TODO: implement light model
-    G_rgb(inherent_rgb[onum][0], inherent_rgb[onum][0], inherent_rgb[onum][0]);
+    G_rgb(inherent_rgb[onum][0], inherent_rgb[onum][1], inherent_rgb[onum][2]);
+    printf("inherent rgb: %lf %lf %lf", inherent_rgb[onum][0], inherent_rgb[onum][1], inherent_rgb[onum][2]);
 
     M3d_mat_mult(t, V, T[onum]);
     make_graph_step(uStart[onum], uEnd[onum], uStep[onum],
@@ -96,22 +97,21 @@ int main ()
   inherent_rgb[onum][2] = 0.0 ;
 
   nl = 0 ;
-  tlist[nl] = SX ; plist[nl] = 1.25 ; nl++ ;
-  tlist[nl] = SY ; plist[nl] = 1.25 ; nl++ ;
-  tlist[nl] = SZ ; plist[nl] = 1.25 ; nl++ ;  
+  tlist[nl] = SX ; plist[nl] = 0.25 ; nl++ ;
+  tlist[nl] = SY ; plist[nl] = 0.25 ; nl++ ;
+  tlist[nl] = SZ ; plist[nl] = 0.25 ; nl++ ;  
   M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
 
   X[onum] = sphereX; 
   Y[onum] = sphereY; 
   Z[onum] = sphereZ; 
 
-  uStart[onum] = 0; 		uEnd[0] = 2*M_PI,	 uStep[onum] = 0.01;
-  vStart[onum] = -1;		vEnd[0] = 1,		 vStep[onum] = 0.01;
+  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.01;
+  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.01;
 
   onum++ ;
 
 
-  /*
 
   // Build a +x axis with a cylinder.
   inherent_rgb[onum][0] = 1.0 ;
@@ -127,9 +127,13 @@ int main ()
   Y[onum] = cylinderY; 
   Z[onum] = cylinderZ; 
 
+  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
+  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
+
   onum++ ;
 
 
+  /*
   // Build a +y axis with the cylinder file.
   inherent_rgb[onum][0] = 1.0 ;
   inherent_rgb[onum][1] = 1.0 ;
@@ -304,6 +308,7 @@ int main ()
     }
     */
 
+    make_z_buff();
     draw_all_objects(v, V,
 		     X, Y, Z,
 		     uStart, uEnd, uStep,

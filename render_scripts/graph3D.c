@@ -24,13 +24,16 @@ int make_win_transform(double w, double h) {
 	Ttypelist[Tn] = TY ; Tvlist[Tn] =  h / 2.0 ; Tn++ ;
 	M3d_make_movement_sequence_matrix(screenTransform, Ti,   Tn,Ttypelist, Tvlist);
 
-	for(int i=0; i< w; ++i) {
-		for(int j=0; j<h; ++j) {
-			zbuff[i][j] = 10000;
-		}
-	}
 	win_width = w;
 	win_height = h;
+}
+
+int make_z_buff() {
+	for(int i=0; i< win_width; ++i) {
+		for(int j=0; j<win_height; ++j) {
+			zbuff[i][j] = 9999999;
+		}
+	}
 }
 
 
@@ -45,6 +48,7 @@ int plot(double x, double y, double z, double T[4][4])
 	// scale to z=1 plane
 	P[0] /= P[2];
 	P[1] /= P[2];
+	double zbar = P[2];
 
 	// move to screen-space
 	M3d_mat_mult_pt(P, screenTransform, P);
@@ -54,9 +58,9 @@ int plot(double x, double y, double z, double T[4][4])
 
 	// if it's closer to the camera than the previous point, go ahead and render it
 	// also make sure it's actually inside the window
-	if(P[2] < zbuff[xbarbar][ybarbar] &&
-	   0 <= xbarbar && xbarbar < win_width &&
-	   0 <= ybarbar && ybarbar < win_height) {
+	if(zbar < zbuff[xbarbar][ybarbar] && 1) {
+	   //0 <= xbarbar && xbarbar < win_width &&
+	   //0 <= ybarbar && ybarbar < win_height) {
 		G_point(xbarbar, ybarbar);
 		zbuff[xbarbar][ybarbar] = (int)P[2];
 	}
