@@ -104,8 +104,8 @@ int main ()
   Y[onum] = sphereY; 
   Z[onum] = sphereZ; 
 
-  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.01;
-  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.01;
+  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.001;
+  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.001;
 
   onum++ ;
 
@@ -125,8 +125,8 @@ int main ()
   Y[onum] = cylinderY; 
   Z[onum] = cylinderZ; 
 
-  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
-  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
+  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.001;
+  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.001;
 
   onum++ ;
 
@@ -146,8 +146,8 @@ int main ()
   Y[onum] = cylinderY; 
   Z[onum] = cylinderZ; 
 
-  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
-  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
+  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.001;
+  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.001;
 
   onum++ ;
 
@@ -167,8 +167,8 @@ int main ()
   Y[onum] = cylinderY; 
   Z[onum] = cylinderZ; 
 
-  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
-  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
+  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.001;
+  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.001;
 
   onum++ ;
 
@@ -188,8 +188,8 @@ int main ()
   Y[onum] = cylinderY; 
   Z[onum] = cylinderZ; 
 
-  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
-  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
+  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.001;
+  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.001;
 
   onum++ ;
 
@@ -209,8 +209,8 @@ int main ()
   Y[onum] = cylinderY; 
   Z[onum] = cylinderZ; 
 
-  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
-  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
+  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.001;
+  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.001;
 
   onum++ ;
 
@@ -231,8 +231,8 @@ int main ()
   Y[onum] = cylinderY; 
   Z[onum] = cylinderZ; 
 
-  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
-  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
+  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.001;
+  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.001;
 
   onum++ ;
 
@@ -253,8 +253,8 @@ int main ()
   Y[onum] = sphereY; 
   Z[onum] = sphereZ; 
 
-  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.01;
-  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.01;
+  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.001;
+  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.001;
 
   onum++ ;
 
@@ -275,8 +275,8 @@ int main ()
   Y[onum] = sphereY; 
   Z[onum] = sphereZ; 
 
-  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.01;
-  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.01;
+  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.001;
+  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.001;
 
   onum++ ;
 
@@ -297,8 +297,8 @@ int main ()
   Y[onum] = sphereY; 
   Z[onum] = sphereZ; 
 
-  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.01;
-  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.01;
+  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.001;
+  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.001;
 
   onum++ ;
 
@@ -318,9 +318,11 @@ int main ()
   int i;
 
   int fnum ;
+  int max_fnum;
   double t ;
 
   fnum = 0 ;
+  max_fnum = 300;
 
 
   // light model setup
@@ -330,6 +332,8 @@ int main ()
   MAX_DIFFUSE = 0.5 ;
   SPECPOW = 30 ;
 
+  // file saving setup
+  char filename[100];
 
 
 
@@ -377,7 +381,12 @@ int main ()
 
 
     G_display_image();
-    if(G_wait_key() == 'q') {
+
+    sprintf(filename, "growingsun%04d.xwd", fnum);
+    G_save_image_to_file(filename);
+
+
+    if(G_no_wait_key() == 'q' || fnum >= max_fnum) {
       break;
     }
 
