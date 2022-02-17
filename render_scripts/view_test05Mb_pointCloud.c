@@ -4,7 +4,7 @@
 
 // declare global vars
 
-#define M 3
+#define M 10
 double numobjects = 0;
 double inherent_rgb[M][3] ;
 
@@ -25,15 +25,13 @@ void draw_all_objects(double V[4][4], double T[M][4][4],
   double t[4][4];
 
   for(int onum = 0; onum < numobjects; ++onum) {
-    // TODO: implement light model
-    G_rgb(inherent_rgb[onum][0], inherent_rgb[onum][1], inherent_rgb[onum][2]);
-    printf("inherent rgb: %lf %lf %lf", inherent_rgb[onum][0], inherent_rgb[onum][1], inherent_rgb[onum][2]);
 
     M3d_mat_mult(t, V, T[onum]);
     make_graph_step(uStart[onum], uEnd[onum], uStep[onum],
 		    vStart[onum], vEnd[onum], vStep[onum],
     	            (X[onum]), (Y[onum]), (Z[onum]), 
-    		    t);
+    		    t,
+		    inherent_rgb[onum]);
   }
 }
 
@@ -133,11 +131,10 @@ int main ()
   onum++ ;
 
 
-  /*
   // Build a +y axis with the cylinder file.
-  inherent_rgb[onum][0] = 1.0 ;
+  inherent_rgb[onum][0] = 0.3 ;
   inherent_rgb[onum][1] = 1.0 ;
-  inherent_rgb[onum][2] = 1.0 ;
+  inherent_rgb[onum][2] = 0.2 ;
   
   nl = 0 ;
   tlist[nl] = TX ; plist[nl] = 1.00 ; nl++ ;
@@ -148,6 +145,9 @@ int main ()
   X[onum] = cylinderX; 
   Y[onum] = cylinderY; 
   Z[onum] = cylinderZ; 
+
+  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
+  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
 
   onum++ ;
 
@@ -161,6 +161,14 @@ int main ()
   tlist[nl] = TX ; plist[nl] = 1.00 ; nl++ ;
   tlist[nl] = SX ; plist[nl] = 2.00 ; nl++ ;
   tlist[nl] = RY ; plist[nl] = -90  ; nl++ ;
+  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
+  
+  X[onum] = cylinderX; 
+  Y[onum] = cylinderY; 
+  Z[onum] = cylinderZ; 
+
+  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
+  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
 
   onum++ ;
 
@@ -174,6 +182,14 @@ int main ()
   tlist[nl] = SX ; plist[nl] = 2.0*sqrt(2.0); nl++ ;
   tlist[nl] = TZ ; plist[nl] = 3.00 ; nl++ ;
   tlist[nl] = RY ; plist[nl] = 45   ; nl++ ;
+  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
+  
+  X[onum] = cylinderX; 
+  Y[onum] = cylinderY; 
+  Z[onum] = cylinderZ; 
+
+  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
+  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
 
   onum++ ;
 
@@ -187,6 +203,14 @@ int main ()
   tlist[nl] = SX ; plist[nl] = 2.0*sqrt(2.0); nl++ ;
   tlist[nl] = TY ; plist[nl] = 3.00 ; nl++ ;
   tlist[nl] = RZ ; plist[nl] = -45  ; nl++ ;
+  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
+  
+  X[onum] = cylinderX; 
+  Y[onum] = cylinderY; 
+  Z[onum] = cylinderZ; 
+
+  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
+  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
 
   onum++ ;
 
@@ -201,11 +225,19 @@ int main ()
   tlist[nl] = RY ; plist[nl] = 90   ; nl++ ;
   tlist[nl] = TY ; plist[nl] = 3.00 ; nl++ ;
   tlist[nl] = RX ; plist[nl] = 45   ; nl++ ;
+  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
+  
+  X[onum] = cylinderX; 
+  Y[onum] = cylinderY; 
+  Z[onum] = cylinderZ; 
+
+  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
+  vStart[onum] =  0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
 
   onum++ ;
 
 
-  // Build an corner point for +x out of the sphere file.
+  // Build a corner point for +x out of the sphere
   inherent_rgb[onum][0] = 0.8 ;
   inherent_rgb[onum][1] = 1.0 ;
   inherent_rgb[onum][2] = 0.7 ;
@@ -215,6 +247,14 @@ int main ()
   tlist[nl] = SY ; plist[nl] = 0.25 ; nl++ ;
   tlist[nl] = SZ ; plist[nl] = 0.25 ; nl++ ;  
   tlist[nl] = TX ; plist[nl] = 4.20 ; nl++ ;
+  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
+
+  X[onum] = sphereX; 
+  Y[onum] = sphereY; 
+  Z[onum] = sphereZ; 
+
+  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.01;
+  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.01;
 
   onum++ ;
 
@@ -229,6 +269,14 @@ int main ()
   tlist[nl] = SY ; plist[nl] = 0.25 ; nl++ ;
   tlist[nl] = SZ ; plist[nl] = 0.25 ; nl++ ;  
   tlist[nl] = TZ ; plist[nl] = 4.20 ; nl++ ;
+  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
+
+  X[onum] = sphereX; 
+  Y[onum] = sphereY; 
+  Z[onum] = sphereZ; 
+
+  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.01;
+  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.01;
 
   onum++ ;
 
@@ -243,9 +291,16 @@ int main ()
   tlist[nl] = SY ; plist[nl] = 0.25 ; nl++ ;
   tlist[nl] = SZ ; plist[nl] = 0.25 ; nl++ ;  
   tlist[nl] = TY ; plist[nl] = 4.20 ; nl++ ;
+  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
+
+  X[onum] = sphereX; 
+  Y[onum] = sphereY; 
+  Z[onum] = sphereZ; 
+
+  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.01;
+  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.01;
 
   onum++ ;
-  */
 
 
 
@@ -268,6 +323,12 @@ int main ()
   fnum = 0 ;
 
 
+  // light model setup
+  double light_in_world_space[3] = {1, 2, 0};
+  
+  AMBIENT = 0.2 ;
+  MAX_DIFFUSE = 0.5 ;
+  SPECPOW = 30 ;
 
 
 
@@ -296,18 +357,13 @@ int main ()
     G_rgb(0,0,0);
     G_clear();
     printf("rendering frame %d\n", fnum);
-    // render
 
+
+    // render
     M3d_view(v,vi, eye, coi, up);
 
-    /*
-    for (i = 0 ; i < onum ; i++) {
-      M3d_mat_mult_points(x[i], y[i], z[i],
-		          v,
-			  x[i], y[i], z[i], numpoints[i]);
-    }
-    */
-
+    M3d_mat_mult_pt(light_in_eye_space, v, light_in_world_space);
+    
     make_z_buff();
     draw_all_objects(v, V,
 		     X, Y, Z,
@@ -315,13 +371,6 @@ int main ()
 		     vStart, vEnd, vStep
 		     );
 
-    /*
-    for (i = 0 ; i < onum ; i++) {
-      M3d_mat_mult_points(x[i], y[i], z[i],
-		          vi,
-			  x[i], y[i], z[i], numpoints[i]);
-    }
-    */
 
 
 
