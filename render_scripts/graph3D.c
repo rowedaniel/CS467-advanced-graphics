@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "FPToolkit.c"
 #include "M3d_matrix_tools.c"
+#include "xwd_tools_03.c"
 
 
 #define MAX_WIN_WIDTH 2000
@@ -79,7 +80,6 @@ int Light_Model (double irgb[3],
   } else if ((NdotL < 0) && (NdotE < 0)) {
     // eye and light on same side but normal pointing "wrong" way
     N[0] *= (-1.0) ;    N[1] *= (-1.0) ;    N[2] *= (-1.0) ; 
-    NdotL *= (-1.0) ;
     NdotE *= (-1.0) ;   // don't use NdotE below, probably should eliminate this
   }
 
@@ -268,13 +268,24 @@ double calc_dv_dA(double u, double v,
 }
 
 
-int make_graph(double ustart, double uend, double ustep_i,
+
+
+
+
+
+
+// not intended to be used outside of this file
+int make_graph_base(
+	       double ustart, double uend, double ustep_i,
 	       double vstart, double vend, double vstep_i,
 	       double (*X)(double u, double v),
 	       double (*Y)(double u, double v),
 	       double (*Z)(double u, double v),
 	       double T[4][4],
-	       double inherent_rgb[3])
+	       int (*light_model_wrapper)(double u, double v,
+		       			 double eye[3], double P[3], double N[3],
+					 double rgb_out[3])
+	       )
 {
 	double u, v;
 	double ustep = ustep_i;
@@ -314,7 +325,7 @@ int make_graph(double ustart, double uend, double ustep_i,
 
 
 
-			// next, do the lightmodel
+			// next, do the light model
 			double new_rgb[3];
 			double eye[3] = {0, 0, 0};
 			double N[3];
@@ -324,7 +335,8 @@ int make_graph(double ustart, double uend, double ustep_i,
 				   T,
 				   N);
 
-			Light_Model(inherent_rgb, eye, P, N, new_rgb);
+			light_model_wrapper(u, v,   eye, P, N, new_rgb);
+			//Light_Model(inherent_rgb, eye, P, N, new_rgb);
 
 
 
@@ -349,5 +361,69 @@ int make_graph(double ustart, double uend, double ustep_i,
 
 }
 
+
+
+// using inherent rgbs per object:
+
+
+
+
+
+int make_graph(
+	       double ustart, double uend, double ustep_i,
+	       double vstart, double vend, double vstep_i,
+	       double (*X)(double u, double v),
+	       double (*Y)(double u, double v),
+	       double (*Z)(double u, double v),
+	       double T[4][4],
+	       double inherent_rgb[3])
+{
+
+	int rgb_light_model_wrapper(double u, double v,
+		       		   double eye[3], double P[3], double N[3],
+				   double new_rgb[3])
+	{
+		Light_Model(inherent_rgb, eye, P, N, new_rgb);
+	}
+
+
+	make_graph_base(ustart,uend,ustep_i,
+			vstart,vend,vstep_i,
+			X,Y,Z,
+			T,
+			rgb_light_model_wrapper);
+}
+
+
+
+int make_graph_image(
+	       double ustart, double uend, double ustep_i,
+	       double vstart, double vend, double vstep_i,
+	       double (*X)(double u, double v),
+	       double (*Y)(double u, double v),
+	       double (*Z)(double u, double v),
+	       double T[4][4],
+	       int image_ID, int image_width, int image_height)
+{
+
+	int rgb_light_model_wrapper(double u, double v,
+		       		   double eye[3], double P[3], double N[3],
+				   double new_rgb[3])
+	{
+		double rgb[3];
+		int x = floor( image_width * (u-ustart) / (uend-ustart) );
+		int y = floor( image_height* (v-vstart) / (vend-vstart) );
+		int e = get_xwd_map_color(image_ID,  x,y,rgb);
+		if(e == -1) { return -1; }
+		Light_Model(rgb, eye, P, N, new_rgb);
+	}
+
+
+	make_graph_base(ustart,uend,ustep_i,
+			vstart,vend,vstep_i,
+			X,Y,Z,
+			T,
+			rgb_light_model_wrapper);
+}
 
 
