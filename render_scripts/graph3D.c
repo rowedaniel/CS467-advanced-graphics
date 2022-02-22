@@ -1,6 +1,8 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "FPToolkit.c"
 #include "M3d_matrix_tools.c"
+#include "xwd_tools_03.c"
 
 
 #define MAX_WIN_WIDTH 2000
@@ -78,7 +80,6 @@ int Light_Model (double irgb[3],
   } else if ((NdotL < 0) && (NdotE < 0)) {
     // eye and light on same side but normal pointing "wrong" way
     N[0] *= (-1.0) ;    N[1] *= (-1.0) ;    N[2] *= (-1.0) ; 
-    NdotL *= (-1.0) ;
     NdotE *= (-1.0) ;   // don't use NdotE below, probably should eliminate this
   }
 
@@ -125,33 +126,6 @@ int Light_Model (double irgb[3],
 }
 
 
-
-
-
-
-void light_model (double irgb[3],
-                  double *P, double *P2, double *P3, 
-                  double argb[3])
-// irgb == inherent color of object (input to this function)
-// xx[],yy[],zz[] are points in the polygon
-// argb == actual color of object (output of this function)
-{
-  double Eye[3] ;
-  Eye[0] = 0 ; Eye[1] = 0 ; Eye[2] = 0 ; 
-
-  double a[3] ;
-  M3d_vector_mult_const(a, P, -1);
-  M3d_vector_add(a, a, P2);
-
-  double b[3] ;
-  M3d_vector_mult_const(b, P, -1);
-  M3d_vector_add(b, b, P3);
- 
-  double N[3] ;
-  M3d_x_product (N, a,b) ;
-
-  Light_Model (irgb, Eye, P, N, argb) ;
-}
 
 
 
@@ -227,17 +201,117 @@ int plot(double P[3])
 	return 1;
 }
 
-int make_graph_step(double ustart, double uend, double ustep,
-	  	    double vstart, double vend, double vstep,
-	  	    double (*X)(double u, double v),
-	  	    double (*Y)(double u, double v),
-	  	    double (*Z)(double u, double v),
-		    double T[4][4],
-		    double inherent_rgb[3])
+
+
+int get_normal(double u, double v,
+		double ustep, double vstep,
+	  	double (*X)(double u, double v),
+	  	double (*Y)(double u, double v),
+	  	double (*Z)(double u, double v),
+		double T[4][4],
+		double N[3])
+{
+	double P[3]  = {X(u,v), Y(u,v), Z(u,v)};
+	double P2[3] = {X(u+ustep,v), Y(u+ustep,v), Z(u+ustep,v)};
+	double P3[3] = {X(u,v+vstep), Y(u,v+vstep), Z(u,v+vstep)};
+	// get eye, P, and N
+	// transform points to camera-space
+	M3d_mat_mult_pt(P,  T, P);
+	M3d_mat_mult_pt(P2, T, P2);
+	M3d_mat_mult_pt(P3, T, P3);
+
+	// subtract P2-P, P3-P to get vectors, not points
+	M3d_vector_mult_const(P2, P2, -1);
+	M3d_vector_add(P2, P2, P);
+	M3d_vector_mult_const(P2, P2, -1);
+	
+	M3d_vector_mult_const(P3, P3, -1);
+	M3d_vector_add(P3, P3, P);
+	M3d_vector_mult_const(P3, P3, -1);
+
+
+	M3d_x_product(N, P2, P3);
+
+}
+
+double calc_du_dA(double u, double v,
+		   double ustep, double vstep,
+	  	   double (*X)(double u, double v),
+	  	   double (*Y)(double u, double v),
+	  	   double (*Z)(double u, double v),
+		   double T[4][4]
+	       )
+{
+	double N[3];
+	get_normal(u,v,ustep,vstep,X,Y,Z,T,N);
+	double mag1 = M3d_magnitude(N);
+	get_normal(u+ustep, ustep, v,vstep,X,Y,Z,T,N);
+	double mag2 = M3d_magnitude(N);
+	//printf("in calc, mag1, mag2 = %lf, %lf\n", mag1, mag2);
+	return mag2-mag1;
+
+}
+
+double calc_dv_dA(double u, double v,
+		   double ustep, double vstep,
+	  	   double (*X)(double u, double v),
+	  	   double (*Y)(double u, double v),
+	  	   double (*Z)(double u, double v),
+		   double T[4][4]
+	       )
+{
+	double N[3];
+	get_normal(u,v,ustep,vstep,X,Y,Z,T,N);
+	double mag1 = M3d_magnitude(N);
+	return mag1;
+
+}
+
+
+
+
+
+
+
+
+// not intended to be used outside of this file
+int make_graph_base(
+	       double ustart, double uend, double ustep_i,
+	       double vstart, double vend, double vstep_i,
+	       double (*X)(double u, double v),
+	       double (*Y)(double u, double v),
+	       double (*Z)(double u, double v),
+	       double T[4][4],
+	       int (*light_model_wrapper)(double u, double v,
+		       			 double eye[3], double P[3], double N[3],
+					 double rgb_out[3])
+	       )
 {
 	double u, v;
+	double ustep = ustep_i;
+	double vstep = vstep_i;
+	double comp_du_dA, comp_dv_dA;
+	double du_dA, dv_dA;
+
+	const double dv_step_ratio_min = 0.1;
+	const double dv_step_ratio_max = 10;
+
+	// keep trying random comparison points until one of them isn't 0.
+	srand(4242);
+	do {
+		const double u_random = (uend-ustart) * (1.0*rand()/RAND_MAX) + ustart;
+		const double v_random = (vend-vstart) * (1.0*rand()/RAND_MAX) + vstart;
+		comp_dv_dA = calc_dv_dA(u_random, v_random, ustep_i,vstep_i, X,Y,Z, T);
+	} while (comp_dv_dA == 0.0);
+
+
 	for(u = ustart; u < uend; u += ustep) {
+		
+
 		for(v = vstart; v < vend; v += vstep) {
+
+
+
 			double P[3] = {X(u,v), Y(u,v), Z(u,v)};
 			
 			// first, apply the given transformation to move into camera-space
@@ -245,46 +319,24 @@ int make_graph_step(double ustart, double uend, double ustep,
 
 			// don't bother rendering if point is behind camera
 			if(P[2] <= 0) { continue; } 		
+			// also, don't bother rendering if point is not in cone of vision
+			if(fabs(P[0]/P[2]) > 1) { continue; }
+			if(fabs(P[1]/P[2]) > 1) { continue; }
 
-			// next, do the lightmodel
+
+
+			// next, do the light model
 			double new_rgb[3];
-			/*
-			double P2[3] = {X(u+ustep,v), Y(u+ustep,v), Z(u+ustep,v)};
-			double P3[3] = {X(u,v+vstep), Y(u,v+vstep), Z(u,v+vstep)};
-			// transform points to camera-space
-			M3d_mat_mult_pt(P2, T, P2);
-			M3d_mat_mult_pt(P3, T, P3);
-			// do light model
-			light_model(inherent_rgb, P, P2, P3, new_rgb);
-			*/
-
 			double eye[3] = {0, 0, 0};
-			double P2[3] = {X(u+ustep,v), Y(u+ustep,v), Z(u+ustep,v)};
-			double P3[3] = {X(u,v+vstep), Y(u,v+vstep), Z(u,v+vstep)};
-			// transform points to camera-space
-			M3d_mat_mult_pt(P2, T, P2);
-			M3d_mat_mult_pt(P3, T, P3);
-
-			// subtract P2-P, P3-P to get vectors, not points
-			M3d_vector_mult_const(P2, P2, -1);
-			M3d_vector_add(P2, P2, P);
-			M3d_vector_mult_const(P2, P2, -1);
-			
-			M3d_vector_mult_const(P3, P3, -1);
-			M3d_vector_add(P3, P3, P);
-			M3d_vector_mult_const(P3, P3, -1);
-
 			double N[3];
-			M3d_x_product(N, P2, P3);
 
-			/*
-			printf("P:\n");
-			M3d_print_vector(P);
-			printf("N:\n");
-			M3d_print_vector(P);
-			*/
+			get_normal(u, v, ustep, vstep,
+				   X, Y, Z,
+				   T,
+				   N);
 
-			Light_Model(inherent_rgb, eye, P, N, new_rgb);
+			light_model_wrapper(u, v,   eye, P, N, new_rgb);
+			//Light_Model(inherent_rgb, eye, P, N, new_rgb);
 
 
 
@@ -293,10 +345,85 @@ int make_graph_step(double ustart, double uend, double ustep,
 
 
 			plot(P); 
+
+
+			// make the step size variable to make density even
+			dv_dA = calc_dv_dA(u,v, ustep_i,vstep_i, X,Y,Z, T);
+			double ratio = comp_dv_dA / ((dv_dA <= 0.000001) ? 0.000001*comp_dv_dA : dv_dA); // /0 prevention
+			// cap ratio off so that it's always 0.1-10 times the original
+			ratio = fmin(fmax(ratio, dv_step_ratio_min), dv_step_ratio_max);
+
+			vstep = vstep_i * ratio;
+
 		}
+
 	}
 
 }
 
+
+
+// using inherent rgbs per object:
+
+
+
+
+
+int make_graph(
+	       double ustart, double uend, double ustep_i,
+	       double vstart, double vend, double vstep_i,
+	       double (*X)(double u, double v),
+	       double (*Y)(double u, double v),
+	       double (*Z)(double u, double v),
+	       double T[4][4],
+	       double inherent_rgb[3])
+{
+
+	int rgb_light_model_wrapper(double u, double v,
+		       		   double eye[3], double P[3], double N[3],
+				   double new_rgb[3])
+	{
+		Light_Model(inherent_rgb, eye, P, N, new_rgb);
+	}
+
+
+	make_graph_base(ustart,uend,ustep_i,
+			vstart,vend,vstep_i,
+			X,Y,Z,
+			T,
+			rgb_light_model_wrapper);
+}
+
+
+
+int make_graph_image(
+	       double ustart, double uend, double ustep_i,
+	       double vstart, double vend, double vstep_i,
+	       double (*X)(double u, double v),
+	       double (*Y)(double u, double v),
+	       double (*Z)(double u, double v),
+	       double T[4][4],
+	       int image_ID, int image_width, int image_height)
+{
+
+	int rgb_light_model_wrapper(double u, double v,
+		       		   double eye[3], double P[3], double N[3],
+				   double new_rgb[3])
+	{
+		double rgb[3];
+		int x = floor( image_width * (u-ustart) / (uend-ustart) );
+		int y = floor( image_height* (v-vstart) / (vend-vstart) );
+		int e = get_xwd_map_color(image_ID,  x,y,rgb);
+		if(e == -1) { return -1; }
+		Light_Model(rgb, eye, P, N, new_rgb);
+	}
+
+
+	make_graph_base(ustart,uend,ustep_i,
+			vstart,vend,vstep_i,
+			X,Y,Z,
+			T,
+			rgb_light_model_wrapper);
+}
 
 

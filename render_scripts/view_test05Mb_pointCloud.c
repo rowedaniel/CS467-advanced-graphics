@@ -27,7 +27,7 @@ void draw_all_objects(double V[4][4], double T[M][4][4],
   for(int onum = 0; onum < numobjects; ++onum) {
 
     M3d_mat_mult(t, V, T[onum]);
-    make_graph_step(uStart[onum], uEnd[onum], uStep[onum],
+    make_graph(uStart[onum], uEnd[onum], uStep[onum],
 		    vStart[onum], vEnd[onum], vStep[onum],
     	            (X[onum]), (Y[onum]), (Z[onum]), 
     		    t,
@@ -104,11 +104,10 @@ int main ()
   Y[onum] = sphereY; 
   Z[onum] = sphereZ; 
 
-  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.001;
-  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.001;
+  uStart[onum] = 0; 		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.01;
+  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.01;
 
   onum++ ;
-
 
 
   // Build a +x axis with a cylinder.
