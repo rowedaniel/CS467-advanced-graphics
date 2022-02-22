@@ -277,12 +277,17 @@ int make_graph_base(
 
 	// keep trying random comparison points until one of them isn't 0.
 	srand(4242);
-	do {
-		const double u_random = 0;//(uend-ustart) * (1.0*rand()/RAND_MAX) + ustart;
-		const double v_random = 0;//(vend-vstart) * (1.0*rand()/RAND_MAX) + vstart;
+	for(int i=0; i<1000; ++i){
+		const double u_random = (uend-ustart) * (1.0*rand()/RAND_MAX) + ustart;
+		const double v_random = (vend-vstart) * (1.0*rand()/RAND_MAX) + vstart;
 		comp_area_def = calc_area_def(u_random, v_random, ustep,vstep, X,Y,Z, T);
-	} while (comp_area_def == 0.0);
-
+		if (comp_area_def == 0.0) {
+			break;
+		}
+	} 
+	if (comp_area_def == 0.0) {
+		comp_area_def = 1;
+	}
 
 	for(bigu = ustart; bigu < uend; bigu += ustep) {
 
@@ -293,7 +298,7 @@ int make_graph_base(
 			double area_def = calc_area_def(bigu, bigv, ustep,vstep, X,Y,Z, T);
 			if(area_def * area_def == area_def) { area_def = 0; } // nan, inf, or 0
 			double ratio = area_def/comp_area_def;
-			//int ratio = 1;
+			//double ratio = 1;
 			if(ratio != 1) {
 				//printf("ratio: %i, area_def:%lf, comp_area_def:%lf\n", ratio, area_def, comp_area_def);
 			}
