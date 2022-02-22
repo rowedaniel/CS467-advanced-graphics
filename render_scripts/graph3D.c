@@ -234,25 +234,8 @@ int get_normal(double u, double v,
 
 }
 
-double calc_du_dA(double u, double v,
-		   double ustep, double vstep,
-	  	   double (*X)(double u, double v),
-	  	   double (*Y)(double u, double v),
-	  	   double (*Z)(double u, double v),
-		   double T[4][4]
-	       )
-{
-	double N[3];
-	get_normal(u,v,ustep,vstep,X,Y,Z,T,N);
-	double mag1 = M3d_magnitude(N);
-	get_normal(u+ustep, ustep, v,vstep,X,Y,Z,T,N);
-	double mag2 = M3d_magnitude(N);
-	//printf("in calc, mag1, mag2 = %lf, %lf\n", mag1, mag2);
-	return mag2-mag1;
 
-}
-
-double calc_dv_dA(double u, double v,
+double calc_area_def(double u, double v,
 		   double ustep, double vstep,
 	  	   double (*X)(double u, double v),
 	  	   double (*Y)(double u, double v),
@@ -276,8 +259,8 @@ double calc_dv_dA(double u, double v,
 
 // not intended to be used outside of this file
 int make_graph_base(
-	       double ustart, double uend, double ustep_i,
-	       double vstart, double vend, double vstep_i,
+	       double ustart, double uend, double ustep,
+	       double vstart, double vend, double vstep,
 	       double (*X)(double u, double v),
 	       double (*Y)(double u, double v),
 	       double (*Z)(double u, double v),
@@ -288,73 +271,75 @@ int make_graph_base(
 	       )
 {
 	double u, v;
-	double ustep = ustep_i;
-	double vstep = vstep_i;
-	double comp_du_dA, comp_dv_dA;
-	double du_dA, dv_dA;
+	double bigu, bigv;
+	double comp_area_def;
 
-	const double dv_step_ratio_min = 0.1;
-	const double dv_step_ratio_max = 10;
 
 	// keep trying random comparison points until one of them isn't 0.
 	srand(4242);
 	do {
-		const double u_random = (uend-ustart) * (1.0*rand()/RAND_MAX) + ustart;
-		const double v_random = (vend-vstart) * (1.0*rand()/RAND_MAX) + vstart;
-		comp_dv_dA = calc_dv_dA(u_random, v_random, ustep_i,vstep_i, X,Y,Z, T);
-	} while (comp_dv_dA == 0.0);
+		const double u_random = 0;//(uend-ustart) * (1.0*rand()/RAND_MAX) + ustart;
+		const double v_random = 0;//(vend-vstart) * (1.0*rand()/RAND_MAX) + vstart;
+		comp_area_def = calc_area_def(u_random, v_random, ustep,vstep, X,Y,Z, T);
+	} while (comp_area_def == 0.0);
 
 
-	for(u = ustart; u < uend; u += ustep) {
+	for(bigu = ustart; bigu < uend; bigu += ustep) {
+
+
+		for(bigv = vstart; bigv < vend; bigv += vstep) {
+
+			// refine to make sure the resolution is the same
+			double area_def = calc_area_def(bigu, bigv, ustep,vstep, X,Y,Z, T);
+			if(area_def * area_def == area_def) { area_def = 0; } // nan, inf, or 0
+			double ratio = area_def/comp_area_def;
+			//int ratio = 1;
+			if(ratio != 1) {
+				//printf("ratio: %i, area_def:%lf, comp_area_def:%lf\n", ratio, area_def, comp_area_def);
+			}
+			for(double u = bigu; u < bigu+ustep; u += ustep / ratio) {
+				for(double v = bigv; v < bigv+vstep; v += vstep / ratio) {
+
+	
+	
+					double P[3] = {X(u,v), Y(u,v), Z(u,v)};
+					
+					// first, apply the given transformation to move into camera-space
+					M3d_mat_mult_pt(P, T, P);
 		
-
-		for(v = vstart; v < vend; v += vstep) {
-
-
-
-			double P[3] = {X(u,v), Y(u,v), Z(u,v)};
-			
-			// first, apply the given transformation to move into camera-space
-			M3d_mat_mult_pt(P, T, P);
-
-			// don't bother rendering if point is behind camera
-			if(P[2] <= 0) { continue; } 		
-			// also, don't bother rendering if point is not in cone of vision
-			if(fabs(P[0]/P[2]) > 1) { continue; }
-			if(fabs(P[1]/P[2]) > 1) { continue; }
-
-
-
-			// next, do the light model
-			double new_rgb[3];
-			double eye[3] = {0, 0, 0};
-			double N[3];
-
-			get_normal(u, v, ustep, vstep,
-				   X, Y, Z,
-				   T,
-				   N);
-
-			light_model_wrapper(u, v,   eye, P, N, new_rgb);
-			//Light_Model(inherent_rgb, eye, P, N, new_rgb);
-
-
-
-			G_rgb(new_rgb[0], new_rgb[1], new_rgb[2]);
-			//G_rgb(inherent_rgb[0], inherent_rgb[1], inherent_rgb[2]);
-
-
-			plot(P); 
-
-
-			// make the step size variable to make density even
-			dv_dA = calc_dv_dA(u,v, ustep_i,vstep_i, X,Y,Z, T);
-			double ratio = comp_dv_dA / ((dv_dA <= 0.000001) ? 0.000001*comp_dv_dA : dv_dA); // /0 prevention
-			// cap ratio off so that it's always 0.1-10 times the original
-			ratio = fmin(fmax(ratio, dv_step_ratio_min), dv_step_ratio_max);
-
-			vstep = vstep_i * ratio;
-
+					// don't bother rendering if point is behind camera
+					if(P[2] <= 0) { continue; } 		
+					// also, don't bother rendering if point is not in cone of vision
+					if(fabs(P[0]/P[2]) > 1) { continue; }
+					if(fabs(P[1]/P[2]) > 1) { continue; }
+		
+		
+		
+					// next, do the light model
+					double new_rgb[3];
+					double eye[3] = {0, 0, 0};
+					double N[3];
+		
+					get_normal(u, v, ustep, vstep,
+						   X, Y, Z,
+						   T,
+						   N);
+		
+					light_model_wrapper(u, v,   eye, P, N, new_rgb);
+					//Light_Model(inherent_rgb, eye, P, N, new_rgb);
+		
+		
+		
+					G_rgb(new_rgb[0], new_rgb[1], new_rgb[2]);
+					//G_rgb(inherent_rgb[0], inherent_rgb[1], inherent_rgb[2]);
+		
+		
+					plot(P); 
+					//printf("u,v: (%lf, %lf)\n", u, v);
+	
+				}
+			}
+	
 		}
 
 	}
@@ -370,8 +355,8 @@ int make_graph_base(
 
 
 int make_graph(
-	       double ustart, double uend, double ustep_i,
-	       double vstart, double vend, double vstep_i,
+	       double ustart, double uend, double ustep,
+	       double vstart, double vend, double vstep,
 	       double (*X)(double u, double v),
 	       double (*Y)(double u, double v),
 	       double (*Z)(double u, double v),
@@ -387,8 +372,8 @@ int make_graph(
 	}
 
 
-	make_graph_base(ustart,uend,ustep_i,
-			vstart,vend,vstep_i,
+	make_graph_base(ustart,uend,ustep,
+			vstart,vend,vstep,
 			X,Y,Z,
 			T,
 			rgb_light_model_wrapper);
@@ -397,8 +382,8 @@ int make_graph(
 
 
 int make_graph_image(
-	       double ustart, double uend, double ustep_i,
-	       double vstart, double vend, double vstep_i,
+	       double ustart, double uend, double ustep,
+	       double vstart, double vend, double vstep,
 	       double (*X)(double u, double v),
 	       double (*Y)(double u, double v),
 	       double (*Z)(double u, double v),
@@ -419,8 +404,8 @@ int make_graph_image(
 	}
 
 
-	make_graph_base(ustart,uend,ustep_i,
-			vstart,vend,vstep_i,
+	make_graph_base(ustart,uend,ustep,
+			vstart,vend,vstep,
 			X,Y,Z,
 			T,
 			rgb_light_model_wrapper);

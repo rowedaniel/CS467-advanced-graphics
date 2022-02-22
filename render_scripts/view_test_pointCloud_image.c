@@ -82,9 +82,16 @@ int main ()
   onum = 0 ;  // current object number
 
   // The sphere has a radius of 1.0, centered at the origin.
+  /*
   double sphereX(double u, double v) { return sqrt(1-v*v)*cos(u); }
   double sphereY(double u, double v) { return v; }
   double sphereZ(double u, double v) { return sqrt(1-v*v)*sin(u); }
+  */
+  double sphereX(double u, double v) { return cos(u)*cos(v); }
+  double sphereY(double u, double v) { return sin(u)*cos(v); }
+  double sphereZ(double u, double v) { return sin(v); }
+
+
 
   // plane goes from x,y=-1 to x,y=1
   double planeX(double u, double v) { return u; }
@@ -137,12 +144,12 @@ int main ()
   tlist[nl] = SZ ; plist[nl] = 2.00 ; nl++ ;
   M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
   
-  X[onum] = planeX; 
-  Y[onum] = planeY; 
-  Z[onum] = planeZ; 
+  X[onum] = sphereX; 
+  Y[onum] = sphereY; 
+  Z[onum] = sphereZ; 
 
-  uStart[onum] = -1; 		uEnd[onum] = 1,	 	 uStep[onum] = 0.01;
-  vStart[onum] = -1;		vEnd[onum] = 1,		 vStep[onum] = 0.01;
+  uStart[onum] = -M_PI;		uEnd[onum] = M_PI, 	 uStep[onum] = 0.005;
+  vStart[onum] = -M_PI/2;	vEnd[onum] = M_PI/2,	 vStep[onum] = 0.005;
 
   onum++ ;
 
@@ -168,7 +175,7 @@ int main ()
   double t ;
 
   fnum = 0 ;
-  max_fnum = 300;
+  max_fnum = 30;
 
 
   // light model setup
@@ -228,7 +235,7 @@ int main ()
 
     G_display_image();
 
-    sprintf(filename, "growingsun%04d.xwd", fnum);
+    sprintf(filename, "pointcloudimg%04d.xwd", fnum);
     G_save_image_to_file(filename);
 
 
@@ -241,7 +248,7 @@ int main ()
   } // end while (1)
 
 
-  while ('q' != G_wait_key()) {}
+  //while ('q' != G_wait_key()) {}
 
 
 }

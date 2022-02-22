@@ -1,0 +1,20 @@
+Timing resluts:
+
+Experiment 1:
+object: sphere
+coloration: clock.xwd
+transformation:
+  - TX 1
+  - SX 4
+  - SY 2
+  - SZ 2
+
+trial 1--no refinement, step size=0.005:
+  - 10.223 seconds
+trial 2--no refinement, step size=0.01:
+  - 2.726 seconds
+trial 3--refinement, step size=0.005:
+  - 33.894 seconds
+trial 4--refinement, step size=0.01:
+  - 8.899 seconds
+
