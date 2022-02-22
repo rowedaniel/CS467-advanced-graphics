@@ -381,7 +381,7 @@ int main ()
 
     G_display_image();
 
-    sprintf(filename, "growingsun%04d.xwd", fnum);
+    sprintf(filename, "pointcloud%04d.xwd", fnum);
     G_save_image_to_file(filename);
 
 
