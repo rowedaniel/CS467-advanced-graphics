@@ -204,16 +204,16 @@ int plot(double P[3])
 
 
 int get_normal(double u, double v,
-		double ustep, double vstep,
-	  	double (*X)(double u, double v),
-	  	double (*Y)(double u, double v),
-	  	double (*Z)(double u, double v),
-		double T[4][4],
-		double N[3])
+	       double ustep, double vstep,
+	       int (*f)(double u, double v, double P[3]),
+	       double T[4][4],
+	       double N[3])
 {
-	double P[3]  = {X(u,v), Y(u,v), Z(u,v)};
-	double P2[3] = {X(u+ustep,v), Y(u+ustep,v), Z(u+ustep,v)};
-	double P3[3] = {X(u,v+vstep), Y(u,v+vstep), Z(u,v+vstep)};
+	double P[3], P2[3], P3[3];
+	if(!f(u, v, P)) { return 0; }
+	if(!f(u+ustep, v, P2)) { return 0; }
+	if(!f(u, v+vstep, P3)) { return 0; }
+
 	// get eye, P, and N
 	// transform points to camera-space
 	M3d_mat_mult_pt(P,  T, P);
@@ -231,20 +231,19 @@ int get_normal(double u, double v,
 
 
 	M3d_x_product(N, P2, P3);
+	return 1;
 
 }
 
 
 double calc_area_def(double u, double v,
 		   double ustep, double vstep,
-	  	   double (*X)(double u, double v),
-	  	   double (*Y)(double u, double v),
-	  	   double (*Z)(double u, double v),
+	  	   int (*f)(double u, double v, double P[3]),
 		   double T[4][4]
 	       )
 {
 	double N[3];
-	get_normal(u,v,ustep,vstep,X,Y,Z,T,N);
+	if(!get_normal(u,v,ustep,vstep,f,T,N)) { return 0; }
 	double mag1 = M3d_magnitude(N);
 	return mag1;
 
@@ -261,9 +260,7 @@ double calc_area_def(double u, double v,
 int make_graph_base(
 	       double ustart, double uend, double ustep,
 	       double vstart, double vend, double vstep,
-	       double (*X)(double u, double v),
-	       double (*Y)(double u, double v),
-	       double (*Z)(double u, double v),
+	       int (*f)(double u, double v, double P[3]),
 	       double T[4][4],
 	       int (*light_model_wrapper)(double u, double v,
 		       			 double eye[3], double P[3], double N[3],
@@ -277,10 +274,10 @@ int make_graph_base(
 
 	// keep trying random comparison points until one of them isn't 0.
 	srand(4242);
-	for(int i=0; i<1000; ++i){
+	for(int i=0; i<100; ++i){
 		const double u_random = (uend-ustart) * (1.0*rand()/RAND_MAX) + ustart;
 		const double v_random = (vend-vstart) * (1.0*rand()/RAND_MAX) + vstart;
-		comp_area_def = calc_area_def(u_random, v_random, ustep,vstep, X,Y,Z, T);
+		comp_area_def = calc_area_def(u_random, v_random, ustep,vstep, f, T);
 		if (comp_area_def == 0.0) {
 			break;
 		}
@@ -295,8 +292,11 @@ int make_graph_base(
 		for(bigv = vstart; bigv < vend; bigv += vstep) {
 
 			// refine to make sure the resolution is the same
-			double area_def = calc_area_def(bigu, bigv, ustep,vstep, X,Y,Z, T);
-			if(area_def * area_def == area_def) { area_def = 0; } // nan, inf, or 0
+			double area_def = calc_area_def(bigu, bigv, ustep,vstep, f, T);
+			if(area_def * area_def == area_def) {
+				// nan, inf, or 0
+				continue;
+			} 
 			double ratio = area_def/comp_area_def;
 			//double ratio = 1;
 			if(ratio != 1) {
@@ -307,7 +307,10 @@ int make_graph_base(
 
 	
 	
-					double P[3] = {X(u,v), Y(u,v), Z(u,v)};
+					double P[3];
+					if(!f(u, v, P)) {
+						continue;
+					}
 					
 					// first, apply the given transformation to move into camera-space
 					M3d_mat_mult_pt(P, T, P);
@@ -325,10 +328,13 @@ int make_graph_base(
 					double eye[3] = {0, 0, 0};
 					double N[3];
 		
-					get_normal(u, v, ustep, vstep,
-						   X, Y, Z,
+					if(!get_normal(u, v, ustep, vstep,
+						   f,
 						   T,
-						   N);
+						   N)) {
+						// error getting normal
+						continue;
+					}
 		
 					light_model_wrapper(u, v,   eye, P, N, new_rgb);
 					//Light_Model(inherent_rgb, eye, P, N, new_rgb);
@@ -357,6 +363,26 @@ int make_graph_base(
 
 
 
+int make_graph_inherentrgb_1func(
+	       double ustart, double uend, double ustep,
+	       double vstart, double vend, double vstep,
+	       int (*f)(double u, double v, double P[3]),
+	       double T[4][4],
+	       double inherent_rgb[3])
+{
+	int rgb_light_model_wrapper(double u, double v,
+		       		   double eye[3], double P[3], double N[3],
+				   double new_rgb[3])
+	{
+		Light_Model(inherent_rgb, eye, P, N, new_rgb);
+	}
+	make_graph_base(
+			ustart,uend,ustep,
+			vstart,vend,vstep,
+			f,
+			T,
+			rgb_light_model_wrapper);
+}
 
 
 int make_graph(
@@ -369,33 +395,31 @@ int make_graph(
 	       double inherent_rgb[3])
 {
 
-	int rgb_light_model_wrapper(double u, double v,
-		       		   double eye[3], double P[3], double N[3],
-				   double new_rgb[3])
-	{
-		Light_Model(inherent_rgb, eye, P, N, new_rgb);
+
+	int f(double u, double v, double P[3]) {
+		P[0] = X(u, v);
+		P[1] = Y(u, v);
+		P[2] = Z(u, v);
+		return 1;
 	}
 
-
-	make_graph_base(ustart,uend,ustep,
+	make_graph_inherentrgb_1func(
+			ustart,uend,ustep,
 			vstart,vend,vstep,
-			X,Y,Z,
+			f,
 			T,
-			rgb_light_model_wrapper);
+			inherent_rgb);
 }
 
 
 
-int make_graph_image(
+int make_graph_image_1func(
 	       double ustart, double uend, double ustep,
 	       double vstart, double vend, double vstep,
-	       double (*X)(double u, double v),
-	       double (*Y)(double u, double v),
-	       double (*Z)(double u, double v),
+	       int (*f)(double u, double v, double P[3]),
 	       double T[4][4],
 	       int image_ID, int image_width, int image_height)
 {
-
 	int rgb_light_model_wrapper(double u, double v,
 		       		   double eye[3], double P[3], double N[3],
 				   double new_rgb[3])
@@ -408,12 +432,39 @@ int make_graph_image(
 		Light_Model(rgb, eye, P, N, new_rgb);
 	}
 
-
-	make_graph_base(ustart,uend,ustep,
+	make_graph_base(
+			ustart,uend,ustep,
 			vstart,vend,vstep,
-			X,Y,Z,
+			f,
 			T,
 			rgb_light_model_wrapper);
+}
+
+
+int make_graph_image(
+	       double ustart, double uend, double ustep,
+	       double vstart, double vend, double vstep,
+	       double (*X)(double u, double v),
+	       double (*Y)(double u, double v),
+	       double (*Z)(double u, double v),
+	       double T[4][4],
+	       int image_ID, int image_width, int image_height)
+{
+
+
+	int f(double u, double v, double P[3]) {
+		P[0] = X(u, v);
+		P[1] = Y(u, v);
+		P[2] = Z(u, v);
+		return 1;
+	}
+
+	make_graph_image_1func(
+			ustart,uend,ustep,
+			vstart,vend,vstep,
+			f,
+			T,
+			image_ID, image_width, image_height);
 }
 
 

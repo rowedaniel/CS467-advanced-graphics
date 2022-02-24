@@ -17,9 +17,7 @@ double inherent_rgb[M][3];
 
 
 void draw_all_objects(double V[4][4], double T[M][4][4],
-		double (*X[M]) (double u, double v),
-		double (*Y[M]) (double u, double v),
-		double (*Z[M]) (double u, double v),
+		int (*f[M]) (double u, double v, double P[3]),
 		double uStart[M], double uEnd[M], double uStep[M],
 		double vStart[M], double vEnd[M], double vStep[M]
 		)
@@ -29,12 +27,12 @@ void draw_all_objects(double V[4][4], double T[M][4][4],
   for(int onum = 0; onum < numobjects; ++onum) {
 
     M3d_mat_mult(t, V, T[onum]);
-    make_graph(uStart[onum], uEnd[onum], uStep[onum],
-		    vStart[onum], vEnd[onum], vStep[onum],
-    	            (X[onum]), (Y[onum]), (Z[onum]), 
-    		    t,
-		    inherent_rgb[onum]
-		    );
+    make_graph_inherentrgb_1func(uStart[onum], uEnd[onum], uStep[onum],
+	       vStart[onum], vEnd[onum], vStep[onum],
+    	       f[onum], 
+               t,
+	       inherent_rgb[onum]
+	       );
 
   }
 }
@@ -54,9 +52,7 @@ int main ()
   int tlist[100] ;
   double plist[100] ;
   // array of generation functions for each shape
-  double (*X[M]) (double u, double v);
-  double (*Y[M]) (double u, double v);
-  double (*Z[M]) (double u, double v);
+  int (*f[M]) (double u, double v, double P[3]);
 
   // array of start/stop/step values for each parameterization
   double uStart[M], uEnd[M], uStep[M];
@@ -83,54 +79,66 @@ int main ()
   onum = 0 ;  // current object number
 
   // The sphere has a radius of 1.0, centered at the origin.
-  double sphereX(double u, double v) { return sqrt(1-v*v)*cos(u); }
-  double sphereY(double u, double v) { return v; }
-  double sphereZ(double u, double v) { return sqrt(1-v*v)*sin(u); }
+  double sphere(double u, double v, double P[3]) {
+	  const double a = 1-v*v;
+	  if(a<0) { return 0; }
+	  const double b = sqrt(a);
+  	  P[0] = b*cos(u);
+      	  P[1] =  v;
+      	  P[2] = b*sin(u);
+    	  return 1;
+  }
 
   // Torus has center radius 1, outer radius 0.1
-  const double torus_centerR = 1;
-  const double torus_outerR = 0.1;
-  double torusX(double u, double v) { return (torus_centerR + torus_outerR*cos(v)) * cos(u); }
-  double torusY(double u, double v) { return (torus_centerR + torus_outerR*cos(v)) * sin(u); }
-  double torusZ(double u, double v) { return torus_outerR*sin(v); }
+  int torus(double u, double v, double P[3]) {
+	  const double torus_centerR = 1;
+	  const double torus_outerR = 0.1;
+	  const double torus_squareness = 1.0 / 4.0;
+	  double f(double x) {
+	  	double a = cos(x);
+	  	return ((a>0)-(a<0)) * pow(fabs(a), torus_squareness);
+	  }
+	  P[0] = (torus_centerR + torus_outerR*f(v)) * cos(u);
+	  P[1] = (torus_centerR + torus_outerR*f(v)) * sin(u);
+	  P[2] = torus_outerR*sin(v);
+	  return 1;
+  }
   
   // The cylinder has radius of 0.1, centered at origin, 
   // lying on the x-axis from x = -1 to x = 1.
-  double cylinderX(double u, double v) { return u; }
-  double cylinderY(double u, double v) { return 0.1*cos(v); }
-  double cylinderZ(double u, double v) { return 0.1*sin(v); }
+  int cylinder(double u, double v, double P[3]) {
+	  double rad = 0.1;
+  	  P[0] = u;
+  	  P[1] =  rad*cos(v);
+  	  P[2] =  rad*sin(v);
+	  return 1;
+  }
 
   // door bays are circles (filled in), but with a rectangular slot cut out
-  const double doorbay_angle = M_PI/5;
-  const double doorbay_x = cos(doorbay_angle);
-  const double doorbay_y = sin(doorbay_angle);
+  int doorbay(double u, double v, double P[3]) {
+	  const double doorbay_angle = M_PI/9;
+	  const double doorbay_inset = 0.8;
+	  const double doorbay_x = doorbay_inset * cos(doorbay_angle);
+	  const double doorbay_y = doorbay_inset * sin(doorbay_angle);
 
-  /*
-  double doorbayX(double u, double v) { double a=v*cos(u); return -doorbay_x < a && a < doorbay_x ? a : v; }
-  double doorbayY(double u, double v) { double a=v*sin(u); return -doorbay_y < a && a < doorbay_y ? a : v; }
-  double doorbayZ(double u, double v) { return 0; }
-  */
-  
-  //  double doorbayZ(double u, double v) { return v; }
-  double doorbayX(double u, double v) {
-    double x=v*cos(u);
-    double y=v*sin(u);
-    if(-doorbay_x < x && x < doorbay_x && -doorbay_y < y && y < doorbay_y) {
-	    return x;
-    }
-    return 0 ;
+	  const double x=v*cos(u);
+	  const double y=v*sin(u);
+
+	  if(-doorbay_x < x && x < doorbay_x && -doorbay_y < y && y < doorbay_y) {
+	    return 0;
+	  }
+
+	  P[0] =  x;
+	  P[1] =  y;
+	  P[2] =  0;
+	  return 1;
   }
-  double doorbayY(double u, double v) {
-    double x=v*cos(u);
-    double y=v*sin(u);
-    if(-doorbay_x < x && x < doorbay_x && -doorbay_y < y && y < doorbay_y) {
-	    return y;
-    }
-    return 0 ;    
-  }  
-  double doorbayZ(double u, double v) { return 0; }
 
-  
+
+  double station_color[3] = {0.8, 0.8, 0.9};
+  double station_highlight[3] = {0.7, 0.3, 0.5};
+
+
 
   //image_IDs[onum] = init_xwd_map_from_file("clock.xwd");
   //if(image_IDs[onum] == -1) { printf("File load failure!\n"); exit(0); }
@@ -139,103 +147,83 @@ int main ()
 
 
   // Build central axis cylinder.
-  inherent_rgb[onum][0] = 0.8;
-  inherent_rgb[onum][1] = 0.8;
-  inherent_rgb[onum][2] = 0.8;
+  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
 
   nl = 0 ;
-  tlist[nl] = SX ; plist[nl] = 4.00 ; nl++ ;
+  tlist[nl] = SX ; plist[nl] = 2.00 ; nl++ ;
   tlist[nl] = SY ; plist[nl] = 6.00 ; nl++ ;
   tlist[nl] = SZ ; plist[nl] = 6.00 ; nl++ ;
   M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
   
-  X[onum] = cylinderX; 
-  Y[onum] = cylinderY; 
-  Z[onum] = cylinderZ; 
+  f[onum] = cylinder; 
 
-  uStart[onum] = -1;		uEnd[onum] = 1, 	 uStep[onum] = 0.05;
-  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.05;
+  uStart[onum] = -1;		uEnd[onum] = 1, 	 uStep[onum] = 0.01;
+  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
 
   onum++ ;
 
 
-
   for(int i=0; i<2; ++i) {
 	  // Build radial torusi
-	  inherent_rgb[onum][0] = 0.8;
-	  inherent_rgb[onum][1] = 0.8;
-	  inherent_rgb[onum][2] = 0.8;
+	  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
 	
 	  nl = 0 ;
 	  tlist[nl] = SX ; plist[nl] = 4.00 ; nl++ ;
 	  tlist[nl] = SY ; plist[nl] = 4.00 ; nl++ ;
 	  tlist[nl] = SZ ; plist[nl] = 4.00 ; nl++ ;
 	  tlist[nl] = RY ; plist[nl] = 90.0 ; nl++ ;
-	  tlist[nl] = TX ; plist[nl] = 4.00*(i*2-1) ; nl++ ;
+	  tlist[nl] = TX ; plist[nl] = 2.00*(i*2-1) ; nl++ ;
 	  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
 	  
-	  X[onum] = torusX; 
-	  Y[onum] = torusY; 
-	  Z[onum] = torusZ; 
+	  f[onum] = torus; 
 	
-	  uStart[onum] = 0;		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.1;
-	  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.1;
+	  uStart[onum] = 0;		uEnd[onum] = 2*M_PI+0.1,	 uStep[onum] = 0.01;
+	  vStart[onum] = 0;		vEnd[onum] = 2*M_PI+0.1,	 vStep[onum] = 0.01;
 	
 	  onum++ ;
 
 
-	  /*
 	  // Build larger cylinder ends
-	  inherent_rgb[onum][0] = 0.8;
-	  inherent_rgb[onum][1] = 0.8;
-	  inherent_rgb[onum][2] = 0.8;
+	  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
 	
 	  nl = 0 ;
 	  tlist[nl] = SY ; plist[nl] = 10.00 ; nl++ ;
 	  tlist[nl] = SZ ; plist[nl] = 10.00 ; nl++ ;
-	  tlist[nl] = TX ; plist[nl] = 3.00*(i*2-1) ; nl++ ;
+	  tlist[nl] = TX ; plist[nl] = 1.00*(i*2-1) ; nl++ ;
 	  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
 	  
-	  X[onum] = cylinderX; 	  Y[onum] = cylinderY; 	  Z[onum] = cylinderZ; 
+	  f[onum] = cylinder;
 	
-	  uStart[onum] = -1;		uEnd[onum] = 1,		 uStep[onum] = 0.1;
-	  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.1;
+	  uStart[onum] = -1;		uEnd[onum] = 1,		 uStep[onum] = 0.01;
+	  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
 	
 	  onum++ ;
-	  */
 
 
 
 	  // Build doorbays
-	  inherent_rgb[onum][0] = 1.0;
-	  inherent_rgb[onum][1] = 0.0;
-	  inherent_rgb[onum][2] = 0.0;
+	  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
 	
 	  nl = 0 ;
-	  tlist[nl] = SX ; plist[nl] = 4.00 ; nl++ ;
-	  tlist[nl] = SY ; plist[nl] = 4.00 ; nl++ ;
-	  tlist[nl] = SZ ; plist[nl] = 4.00 ; nl++ ;
+	  tlist[nl] = SY ; plist[nl] = 1.00 ; nl++ ;
+	  tlist[nl] = SZ ; plist[nl] = 1.00 ; nl++ ;
 	  tlist[nl] = RY ; plist[nl] = 90.0 ; nl++ ;
-	  tlist[nl] = TX ; plist[nl] = 4.00*(i*2-1) ; nl++ ;
+	  tlist[nl] = TX ; plist[nl] = 2.00*(i*2-1) ; nl++ ;
 	  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
 
 	  
-       	  X[onum] = doorbayX; 	  Y[onum] = doorbayY; 	  Z[onum] = doorbayZ;
-	  //	  X[onum] = cylinderX; 	  Y[onum] = cylinderY; 	  Z[onum] = cylinderZ; 
+       	  f[onum] = doorbay;
 	  
-	  uStart[onum] = 0;		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.1;
-	  vStart[onum] = 0;		vEnd[onum] = 1,		 vStep[onum] = 0.1;
+	  uStart[onum] = 0;		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.01;
+	  vStart[onum] = 0;		vEnd[onum] = 1,		 vStep[onum] = 0.01;
 	
 	  onum++ ;
 
 
 
-	  /*
 	  // Build 'spokes'
 	  for(int j=0; j<2; ++j) {
-		  inherent_rgb[onum][0] = 0.6;
-		  inherent_rgb[onum][1] = 0.6;
-		  inherent_rgb[onum][2] = 0.8;
+		  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
 		
 		  nl = 0 ;
 		  //tlist[nl] = TZ ; plist[nl] = 1.00 ; nl++ ;
@@ -244,21 +232,33 @@ int main ()
 		  tlist[nl] = SZ ; plist[nl] = 4.00 ; nl++ ;
 		  tlist[nl] = RY ; plist[nl] = 90.0 ; nl++ ;
 		  tlist[nl] = RX ; plist[nl] = 90.00*j ; nl++ ;
-		  tlist[nl] = TX ; plist[nl] = 4.00*(i*2-1) ; nl++ ;
+		  tlist[nl] = TX ; plist[nl] = 2.00*(i*2-1) ; nl++ ;
 		  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
 		  
-		  X[onum] = cylinderX; 
-		  Y[onum] = cylinderY; 
-		  Z[onum] = cylinderZ; 
+		  f[onum] = cylinder; 
 		
-		  uStart[onum] = -1;		uEnd[onum] = 1,		 uStep[onum] = 0.2;
-		  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.2;
+		  uStart[onum] = -1;		uEnd[onum] = 1,		 uStep[onum] = 0.01;
+		  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
 		
 		  onum++ ;
 
 	  }
-	  */
   }
+
+  // transform all the space-station objects to be in a reasonable position in worldspace
+  {
+  double tmp_T[4][4], tmp_Ti[4][4];
+  nl = 0 ;
+  tlist[nl] = RX ; plist[nl] = -55.0 ; nl++ ;
+  tlist[nl] = RY ; plist[nl] = -30.0 ; nl++ ;
+  tlist[nl] = RZ ; plist[nl] = 10.0 ; nl++ ;
+  M3d_make_movement_sequence_matrix (tmp_T,tmp_Ti,  nl,tlist,plist) ;
+  for(int i=0; i<onum; ++i) {
+	  M3d_mat_mult(V[i],  tmp_T, V[i]);
+	  M3d_mat_mult(Vi[i], Vi[i], tmp_T);
+  }
+  }
+
 
 
 
@@ -288,7 +288,7 @@ int main ()
 
 
   // light model setup
-  double light_in_world_space[3] = {0,  10, 4};
+  double light_in_world_space[3] = {2,  1, 8};
   
   AMBIENT = 0.2 ;
   MAX_DIFFUSE = 0.5 ;
@@ -296,7 +296,6 @@ int main ()
 
   // file saving setup
   char filename[100];
-
 
 
   while (1) {
@@ -332,7 +331,7 @@ int main ()
     
     make_z_buff();
     draw_all_objects(v, V,
-		     X, Y, Z,
+		     f,
 		     uStart, uEnd, uStep,
 		     vStart, vEnd, vStep
 		     );
