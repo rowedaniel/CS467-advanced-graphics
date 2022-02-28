@@ -89,11 +89,59 @@ int main ()
     	  return 1;
   }
 
-  // Torus has center radius 1, outer radius 0.1
+  // "Torus" has center radius 1, outer radius 0.1
   int torus(double u, double v, double P[3]) {
 	  const double torus_centerR = 1;
-	  const double torus_outerR = 0.1;
-	  const double torus_squareness = 1.0 / 4.0;
+	  const double torus_outerR = 0.1 / 2.0;
+	  const double torus_squareness = 1.0 / 3.0;
+
+	  if(v >= 8) { return 0; }
+
+
+	  double r, z;
+	  {
+	  const double c = cos(M_PI/2.0 * v);
+	  const double s = sin(M_PI/2.0 * v);
+	  if(0 <= v && v < 1) {
+		  r = 2;
+		  z = 2*v-1;
+	  } else if (1 <= v && v < 2) {
+		  r = 1+s;
+		  z = 1-c;
+	  } else if(2 <= v && v < 3) {
+		  r = 5-2*v;
+		  z = 2;
+	  } else if(3 <= v && v < 4) {
+		  r = -1-c;
+		  z = 1-s;
+	  } else if(4 <= v && v < 5) {
+		  r = -2;
+		  z = 9-2*v;
+	  } else if(5 <= v && v < 6) {
+		  r = -1-s;
+		  z = -1+c;
+	  } else if(6 <= v && v < 7) {
+		  r = -13+2*v;
+		  z = -2;
+	  } else if(7 <= v && v <= 8) {
+		  r = 1+c;
+		  z = -1+s;
+	  }
+	  }
+
+
+	  P[0] = (torus_centerR + torus_outerR*r) * cos(u);
+	  P[1] = (torus_centerR + torus_outerR*r) * sin(u);
+	  P[2] = torus_outerR*z;
+	  return 1;
+  }
+
+
+  // scaffolding is same as torus, but different parameterization (makes it look cooler)
+  int scaffolding(double u, double v, double P[3]) {
+	  const double torus_centerR = 1;
+	  const double torus_outerR = 0.08;
+	  const double torus_squareness = 1.0 / 3.0;
 	  double f(double x) {
 	  	double a = cos(x);
 	  	return ((a>0)-(a<0)) * pow(fabs(a), torus_squareness);
@@ -108,7 +156,7 @@ int main ()
   // lying on the x-axis from x = -1 to x = 1.
   int cylinder(double u, double v, double P[3]) {
 	  double rad = 0.1;
-  	  P[0] = u;
+  	  P[0] = -u;
   	  P[1] =  rad*cos(v);
   	  P[2] =  rad*sin(v);
 	  return 1;
@@ -136,7 +184,10 @@ int main ()
 
 
   double station_color[3] = {0.8, 0.8, 0.9};
-  double station_highlight[3] = {0.7, 0.3, 0.5};
+  double station_highlight[3] = {0.7, 0.3, 0.4};
+
+  double highres = 0.05;//0.001;
+  double lowres = 0.2;
 
 
 
@@ -157,30 +208,73 @@ int main ()
   
   f[onum] = cylinder; 
 
-  uStart[onum] = -1;		uEnd[onum] = 1, 	 uStep[onum] = 0.01;
-  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
+  uStart[onum] = -1;		uEnd[onum] = 1, 	 uStep[onum] = highres;
+  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = highres;
 
   onum++ ;
 
 
-  for(int i=0; i<2; ++i) {
-	  // Build radial torusi
+  // Build radial torus
+  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
+
+  nl = 0 ;
+  tlist[nl] = SX ; plist[nl] = 4.00 ; nl++ ;
+  tlist[nl] = SY ; plist[nl] = 4.00 ; nl++ ;
+  tlist[nl] = SZ ; plist[nl] = 4.00 ; nl++ ;
+  tlist[nl] = RY ; plist[nl] = 90.0 ; nl++ ;
+  tlist[nl] = TX ; plist[nl] = 2.00 ; nl++ ;
+  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
+  
+  f[onum] = torus; 
+
+  uStart[onum] = 0;		uEnd[onum] = 2*M_PI;	uStep[onum] = highres;
+  vStart[onum] = 0;		vEnd[onum] = 8;		vStep[onum] = highres;
+  onum++ ;
+
+
+  // build scaffolding
+
+  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_highlight[c];}
+
+  nl = 0 ;
+  tlist[nl] = SX ; plist[nl] = 4.00 ; nl++ ;
+  tlist[nl] = SY ; plist[nl] = 4.00 ; nl++ ;
+  tlist[nl] = SZ ; plist[nl] = 4.00 ; nl++ ;
+  tlist[nl] = RY ; plist[nl] = 90.0 ; nl++ ;
+  tlist[nl] = TX ; plist[nl] = -2.00 ; nl++ ;
+  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
+  
+  f[onum] = scaffolding; 
+
+  uStart[onum] = 0;		uEnd[onum] = 2*M_PI;	uStep[onum] = lowres;
+  vStart[onum] = 0;		vEnd[onum] = 8;		vStep[onum] = lowres;
+
+  onum++ ;
+
+  for(int i=0; i<4; ++i) {
+	  // built sections of scaffold
 	  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
-	
+
 	  nl = 0 ;
 	  tlist[nl] = SX ; plist[nl] = 4.00 ; nl++ ;
 	  tlist[nl] = SY ; plist[nl] = 4.00 ; nl++ ;
 	  tlist[nl] = SZ ; plist[nl] = 4.00 ; nl++ ;
 	  tlist[nl] = RY ; plist[nl] = 90.0 ; nl++ ;
-	  tlist[nl] = TX ; plist[nl] = 2.00*(i*2-1) ; nl++ ;
+	  tlist[nl] = RX ; plist[nl] = i*90.0 ; nl++ ;
+	  tlist[nl] = TX ; plist[nl] = -2.00 ; nl++ ;
 	  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
 	  
 	  f[onum] = torus; 
-	
-	  uStart[onum] = 0;		uEnd[onum] = 2*M_PI+0.1,	 uStep[onum] = 0.01;
-	  vStart[onum] = 0;		vEnd[onum] = 2*M_PI+0.1,	 vStep[onum] = 0.01;
-	
+
+	  uStart[onum] = -M_PI/10.0;	uEnd[onum] = M_PI/10.0;	uStep[onum] = highres;
+	  vStart[onum] = 0;		vEnd[onum] = 8;		vStep[onum] = highres;
+
 	  onum++ ;
+  }
+
+
+
+  for(int i=0; i<2; ++i) {
 
 
 	  // Build larger cylinder ends
@@ -189,13 +283,14 @@ int main ()
 	  nl = 0 ;
 	  tlist[nl] = SY ; plist[nl] = 10.00 ; nl++ ;
 	  tlist[nl] = SZ ; plist[nl] = 10.00 ; nl++ ;
-	  tlist[nl] = TX ; plist[nl] = 1.00*(i*2-1) ; nl++ ;
+	  tlist[nl] = SX ; plist[nl] = 0.50 ; nl++ ;
+	  tlist[nl] = TX ; plist[nl] = 2.00*(i*2-1) ; nl++ ;
 	  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
 	  
 	  f[onum] = cylinder;
 	
-	  uStart[onum] = -1;		uEnd[onum] = 1,		 uStep[onum] = 0.01;
-	  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
+	  uStart[onum] = -1;		uEnd[onum] = 1,		 uStep[onum] = highres;
+	  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = highres;
 	
 	  onum++ ;
 
@@ -206,39 +301,40 @@ int main ()
 	
 	  nl = 0 ;
 	  tlist[nl] = SY ; plist[nl] = 1.00 ; nl++ ;
-	  tlist[nl] = SZ ; plist[nl] = 1.00 ; nl++ ;
-	  tlist[nl] = RY ; plist[nl] = 90.0 ; nl++ ;
-	  tlist[nl] = TX ; plist[nl] = 2.00*(i*2-1) ; nl++ ;
+	  tlist[nl] = SX ; plist[nl] = 1.00 ; nl++ ;
+	  tlist[nl] = RY ; plist[nl] = -90.0; nl++ ;
+	  tlist[nl] = TX ; plist[nl] = 2.50*(i*2-1) ; nl++ ;
 	  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
 
 	  
        	  f[onum] = doorbay;
 	  
-	  uStart[onum] = 0;		uEnd[onum] = 2*M_PI,	 uStep[onum] = 0.01;
-	  vStart[onum] = 0;		vEnd[onum] = 1,		 vStep[onum] = 0.01;
+	  uStart[onum] = 0;		uEnd[onum] = 2*M_PI,	 uStep[onum] = highres;
+	  vStart[onum] = 0;		vEnd[onum] = 1,		 vStep[onum] = highres;
 	
 	  onum++ ;
 
 
 
 	  // Build 'spokes'
-	  for(int j=0; j<2; ++j) {
+	  for(int j=0; j<4; ++j) {
 		  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
 		
 		  nl = 0 ;
 		  //tlist[nl] = TZ ; plist[nl] = 1.00 ; nl++ ;
-		  tlist[nl] = SX ; plist[nl] = 4.00 ; nl++ ;
+		  tlist[nl] = SX ; plist[nl] = 1.50 ; nl++ ;
 		  tlist[nl] = SY ; plist[nl] = 4.00 ; nl++ ;
 		  tlist[nl] = SZ ; plist[nl] = 4.00 ; nl++ ;
 		  tlist[nl] = RY ; plist[nl] = 90.0 ; nl++ ;
+		  tlist[nl] = TZ ; plist[nl] = 2.50 ; nl++ ;
 		  tlist[nl] = RX ; plist[nl] = 90.00*j ; nl++ ;
 		  tlist[nl] = TX ; plist[nl] = 2.00*(i*2-1) ; nl++ ;
 		  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
 		  
 		  f[onum] = cylinder; 
 		
-		  uStart[onum] = -1;		uEnd[onum] = 1,		 uStep[onum] = 0.01;
-		  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = 0.01;
+		  uStart[onum] = -1;		uEnd[onum] = 1,		 uStep[onum] = highres;
+		  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = highres;
 		
 		  onum++ ;
 
