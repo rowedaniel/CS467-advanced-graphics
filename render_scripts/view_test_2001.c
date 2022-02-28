@@ -6,6 +6,7 @@
 
 #define M 100
 double numobjects = 0;
+int color_type[M];
 int image_IDs[M];
 int image_size[M][2];
 double inherent_rgb[M][3];
@@ -27,12 +28,23 @@ void draw_all_objects(double V[4][4], double T[M][4][4],
   for(int onum = 0; onum < numobjects; ++onum) {
 
     M3d_mat_mult(t, V, T[onum]);
-    make_graph_inherentrgb_1func(uStart[onum], uEnd[onum], uStep[onum],
-	       vStart[onum], vEnd[onum], vStep[onum],
-    	       f[onum], 
-               t,
-	       inherent_rgb[onum]
-	       );
+    if(color_type[onum]) {
+    	make_graph_inherentrgb_1func(
+			uStart[onum], uEnd[onum], uStep[onum],
+	       		vStart[onum], vEnd[onum], vStep[onum],
+    	       		f[onum], 
+               		t,
+	       		inherent_rgb[onum]
+	       		);
+    } else {
+    	make_graph_image_1func(
+			uStart[onum], uEnd[onum], uStep[onum],
+	       		vStart[onum], vEnd[onum], vStep[onum],
+    	       		f[onum], 
+               		t,
+	       		image_IDs[onum], image_size[onum][0], image_size[onum][1]
+	       		);
+    }
 
   }
 }
@@ -47,10 +59,12 @@ int main ()
   int onum;
 
   // stuff for moving each object to the right location
-  double V[M][4][4], Vi[M][4][4] ;
+  double V[M][4][4], Vi[M][4][4];
   int nl ;
   int tlist[100] ;
   double plist[100] ;
+  double final_trans[4][4], final_transi[4][4];
+  double movement_trans[4][4], movement_transi[4][4];
   // array of generation functions for each shape
   int (*f[M]) (double u, double v, double P[3]);
 
@@ -79,7 +93,7 @@ int main ()
   onum = 0 ;  // current object number
 
   // The sphere has a radius of 1.0, centered at the origin.
-  double sphere(double u, double v, double P[3]) {
+  int sphere(double u, double v, double P[3]) {
 	  const double a = 1-v*v;
 	  if(a<0) { return 0; }
 	  const double b = sqrt(a);
@@ -162,6 +176,16 @@ int main ()
 	  return 1;
   }
 
+  // The cone has radius of 0.1, centered at origin, 
+  // lying on the x-axis from x = 0 to x = 1.
+  int cone(double u, double v, double P[3]) {
+	  double rad = 0.1;
+  	  P[0] = -u;
+  	  P[1] =  rad*u*cos(v);
+  	  P[2] =  rad*u*sin(v);
+	  return 1;
+  }
+
   // door bays are circles (filled in), but with a rectangular slot cut out
   int doorbay(double u, double v, double P[3]) {
 	  const double doorbay_angle = M_PI/9;
@@ -186,19 +210,41 @@ int main ()
   double station_color[3] = {0.8, 0.8, 0.9};
   double station_highlight[3] = {0.7, 0.3, 0.4};
 
-  double highres = 0.05;//0.001;
+  double planetres = 0.1;//0.0001;
+  double highres = 0.1;//0.001;
   double lowres = 0.2;
 
 
 
-  //image_IDs[onum] = init_xwd_map_from_file("clock.xwd");
-  //if(image_IDs[onum] == -1) { printf("File load failure!\n"); exit(0); }
-  //error = get_xwd_map_dimensions(image_IDs[onum],image_size[onum]); 
-  //if(error == -1) { printf("File load failure!\n"); exit(0); }
+  // build planet
+  image_IDs[onum] = init_xwd_map_from_file("earth_jeff.xwd");
+  if(image_IDs[onum] == -1) { printf("File load failure!\n"); exit(0); }
+  error = get_xwd_map_dimensions(image_IDs[onum],image_size[onum]); 
+  if(error == -1) { printf("File load failure!\n"); exit(0); }
+
+  nl = 0 ;
+  tlist[nl] = RX ; plist[nl] = -45.00   ; nl++ ;
+  tlist[nl] = RY ; plist[nl] =  10.00   ; nl++ ;
+  tlist[nl] = TX ; plist[nl] =  0.90    ; nl++ ;
+  tlist[nl] = TY ; plist[nl] = -0.50    ; nl++ ;
+  tlist[nl] = TZ ; plist[nl] = -1.10    ; nl++ ;
+  tlist[nl] = SX ; plist[nl] = -140.00  ; nl++ ;
+  tlist[nl] = SY ; plist[nl] = -140.00  ; nl++ ;
+  tlist[nl] = SZ ; plist[nl] = -140.00  ; nl++ ;
+  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
+  
+  f[onum] = sphere; 
+
+  uStart[onum] = 0;		uEnd[onum] = 2*M_PI, 	 uStep[onum] = planetres;
+  vStart[onum] = M_PI/2;	vEnd[onum] = M_PI/2,	 vStep[onum] = planetres;
+
+  onum++ ;
 
 
+  
   // Build central axis cylinder.
   for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
+  color_type[onum] = 1;
 
   nl = 0 ;
   tlist[nl] = SX ; plist[nl] = 2.00 ; nl++ ;
@@ -216,6 +262,7 @@ int main ()
 
   // Build radial torus
   for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
+  color_type[onum] = 1;
 
   nl = 0 ;
   tlist[nl] = SX ; plist[nl] = 4.00 ; nl++ ;
@@ -235,6 +282,7 @@ int main ()
   // build scaffolding
 
   for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_highlight[c];}
+  color_type[onum] = 1;
 
   nl = 0 ;
   tlist[nl] = SX ; plist[nl] = 4.00 ; nl++ ;
@@ -254,6 +302,7 @@ int main ()
   for(int i=0; i<4; ++i) {
 	  // built sections of scaffold
 	  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
+  	  color_type[onum] = 1;
 
 	  nl = 0 ;
 	  tlist[nl] = SX ; plist[nl] = 4.00 ; nl++ ;
@@ -279,6 +328,7 @@ int main ()
 
 	  // Build larger cylinder ends
 	  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
+  	  color_type[onum] = 1;
 	
 	  nl = 0 ;
 	  tlist[nl] = SY ; plist[nl] = 10.00 ; nl++ ;
@@ -294,23 +344,44 @@ int main ()
 	
 	  onum++ ;
 
+	  // build cone connecters for larger ends
+	  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
+  	  color_type[onum] = 1;
+	
+	  nl = 0 ;
+	  tlist[nl] = SY ; plist[nl] = 10.00 ; nl++ ;
+	  tlist[nl] = SZ ; plist[nl] = 10.00 ; nl++ ;
+	  tlist[nl] = SX ; plist[nl] = 1.00  ; nl++ ;
+	  tlist[nl] = TX ; plist[nl] = 0.50  ; nl++ ;
+	  tlist[nl] = RY ; plist[nl] = 180.0*i ; nl++ ;
+	  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
+	  
+	  f[onum] = cone;
+	
+	  uStart[onum] = -1;		uEnd[onum] = 0,		 uStep[onum] = highres;
+	  vStart[onum] = 0;		vEnd[onum] = 2*M_PI,	 vStep[onum] = highres;
+	
+	  onum++ ;
+
 
 
 	  // Build doorbays
 	  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
+  	  color_type[onum] = 1;
 	
 	  nl = 0 ;
 	  tlist[nl] = SY ; plist[nl] = 1.00 ; nl++ ;
 	  tlist[nl] = SX ; plist[nl] = 1.00 ; nl++ ;
 	  tlist[nl] = RY ; plist[nl] = -90.0; nl++ ;
-	  tlist[nl] = TX ; plist[nl] = 2.50*(i*2-1) ; nl++ ;
+	  tlist[nl] = TX ; plist[nl] = 2.50 ; nl++ ;
+	  tlist[nl] = RY ; plist[nl] = 180.0*i; nl++ ;
 	  M3d_make_movement_sequence_matrix (V[onum],Vi[onum],  nl,tlist,plist) ;
 
 	  
        	  f[onum] = doorbay;
 	  
-	  uStart[onum] = 0;		uEnd[onum] = 2*M_PI,	 uStep[onum] = highres;
-	  vStart[onum] = 0;		vEnd[onum] = 1,		 vStep[onum] = highres;
+	  uStart[onum] = 0;		uEnd[onum] = 2*M_PI,	 uStep[onum] = highres/10;
+	  vStart[onum] = 0;		vEnd[onum] = 1,		 vStep[onum] = highres/10;
 	
 	  onum++ ;
 
@@ -319,6 +390,7 @@ int main ()
 	  // Build 'spokes'
 	  for(int j=0; j<4; ++j) {
 		  for(int c=0;c<3;++c) {inherent_rgb[onum][c]=station_color[c];}
+  		  color_type[onum] = 1;
 		
 		  nl = 0 ;
 		  //tlist[nl] = TZ ; plist[nl] = 1.00 ; nl++ ;
@@ -342,18 +414,12 @@ int main ()
   }
 
   // transform all the space-station objects to be in a reasonable position in worldspace
-  {
-  double tmp_T[4][4], tmp_Ti[4][4];
   nl = 0 ;
   tlist[nl] = RX ; plist[nl] = -55.0 ; nl++ ;
-  tlist[nl] = RY ; plist[nl] = -30.0 ; nl++ ;
+  tlist[nl] = RY ; plist[nl] = -50.0 ; nl++ ;
   tlist[nl] = RZ ; plist[nl] = 10.0 ; nl++ ;
-  M3d_make_movement_sequence_matrix (tmp_T,tmp_Ti,  nl,tlist,plist) ;
-  for(int i=0; i<onum; ++i) {
-	  M3d_mat_mult(V[i],  tmp_T, V[i]);
-	  M3d_mat_mult(Vi[i], Vi[i], tmp_T);
-  }
-  }
+  M3d_make_movement_sequence_matrix (final_trans,final_transi,  nl,tlist,plist) ;
+
 
 
 
@@ -370,6 +436,9 @@ int main ()
   //---------------------------------------------------------------------
 
 
+  // object movement stuff
+  double final_V[M][4][4];
+
   // eye stuff
   double eye[3], coi[3], up[3] ;
   double v[4][4], vi[4][4];
@@ -380,11 +449,11 @@ int main ()
   double t ;
 
   fnum = 0 ;
-  max_fnum = 300;
+  max_fnum = 360;
 
 
   // light model setup
-  double light_in_world_space[3] = {2,  1, 8};
+  double light_in_world_space[3] = {5,  1, 0};
   
   AMBIENT = 0.2 ;
   MAX_DIFFUSE = 0.5 ;
@@ -396,11 +465,11 @@ int main ()
 
   while (1) {
 
-    t = 0.01*fnum ;
+    t = 0.003333*fnum ;
 
-    eye[0] = 15*cos(2*M_PI*t) ; 
-    eye[1] =  6*t ; 
-    eye[2] =  7*sin(2*M_PI*t) ; 
+    eye[0] = 15-t*10; //15(2*M_PI*t) ; 
+    eye[1] =  0; //6*t ; 
+    eye[2] =  5; //7*sin(2*M_PI*t) ; 
 
     // printf("t = %lf   eye = %lf %lf %lf\n",t, eye[0],eye[1],eye[2]) ;
 
@@ -425,8 +494,22 @@ int main ()
 
     M3d_mat_mult_pt(light_in_eye_space, v, light_in_world_space);
     
+    
+    // update space station rotation
+    nl = 0 ;
+    tlist[nl] = RX ; plist[nl] = t*100 ; nl++ ;
+    M3d_make_movement_sequence_matrix (movement_trans,movement_transi,  nl,tlist,plist) ;
+
+    // copy transformation over for planet (it doesn't move)
+    M3d_copy_mat(final_V[0], V[0]);
+    // update transformation for moving objects (not obj 0--the planet)
+    for(int i=1; i<onum; ++i) {
+	    M3d_mat_mult(final_V[i], final_trans, movement_trans);
+	    M3d_mat_mult(final_V[i], final_V[i], V[i]);
+    }
+
     make_z_buff();
-    draw_all_objects(v, V,
+    draw_all_objects(v, final_V,
 		     f,
 		     uStart, uEnd, uStep,
 		     vStart, vEnd, vStep
