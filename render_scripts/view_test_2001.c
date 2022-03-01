@@ -1,4 +1,4 @@
-#include "graph3D.c"
+#include "graph3D_no_window.c"
 
 
 
@@ -11,6 +11,7 @@ int image_IDs[M];
 int image_size[M][2];
 double inherent_rgb[M][3];
 
+int id; // id for xwd tools
 
 
 
@@ -34,7 +35,8 @@ void draw_all_objects(double V[4][4], double T[M][4][4],
 	       		vStart[onum], vEnd[onum], vStep[onum],
     	       		f[onum], 
                		t,
-	       		inherent_rgb[onum]
+	       		inherent_rgb[onum],
+			id
 	       		);
     } else {
     	make_graph_image_1func(
@@ -42,7 +44,8 @@ void draw_all_objects(double V[4][4], double T[M][4][4],
 	       		vStart[onum], vEnd[onum], vStep[onum],
     	       		f[onum], 
                		t,
-	       		image_IDs[onum], image_size[onum][0], image_size[onum][1]
+	       		image_IDs[onum], image_size[onum][0], image_size[onum][1],
+			id
 	       		);
     }
 
@@ -80,7 +83,8 @@ int main ()
   // initialize pointCloud stuff
   make_win_transform(600, 600);
   // init graphics
-  G_init_graphics (win_width, win_height) ;
+  id = create_new_xwd_map(win_width, win_height);
+  if(id == -1) { printf("failure!\n"); exit(0); }
 
 
 
@@ -207,11 +211,11 @@ int main ()
   }
 
 
-  double station_color[3] = {0.8, 0.8, 0.9};
+  double station_color[3] = {0.6, 0.6, 0.9};
   double station_highlight[3] = {0.7, 0.3, 0.4};
 
-  double planetres = 0.1;//0.0001;
-  double highres = 0.1;//0.001;
+  double planetres = 0.01; //0.001;
+  double highres = 0.01; //0.005;
   double lowres = 0.2;
 
 
@@ -236,7 +240,7 @@ int main ()
   f[onum] = sphere; 
 
   uStart[onum] = 0;		uEnd[onum] = 2*M_PI, 	 uStep[onum] = planetres;
-  vStart[onum] = M_PI/2;	vEnd[onum] = M_PI/2,	 vStep[onum] = planetres;
+  vStart[onum] = -M_PI/2;	vEnd[onum] = M_PI/2,	 vStep[onum] = planetres;
 
   onum++ ;
 
@@ -465,17 +469,15 @@ int main ()
 
   while (1) {
 
-    t = 0.003333*fnum ;
+    t = 0.05*fnum; //0.003333*fnum ;
 
     eye[0] = 15-t*10; //15(2*M_PI*t) ; 
     eye[1] =  0; //6*t ; 
     eye[2] =  5; //7*sin(2*M_PI*t) ; 
 
-    // printf("t = %lf   eye = %lf %lf %lf\n",t, eye[0],eye[1],eye[2]) ;
-
-    coi[0] =  1.0 ;
+    coi[0] =  cos(2*M_PI*t) ;
     coi[1] =  2.0 ; 
-    coi[2] =  0.5 ;
+    coi[2] =  sin(2*M_PI*t);
 
     up[0]  = eye[0] ; 
     up[1]  = eye[1] + 1 ;
@@ -483,9 +485,12 @@ int main ()
 
     //------------------------------- put your code here!!!!!!!!!!!!
 
-    // view the screen
-    G_rgb(0,0,0);
-    G_clear();
+    // clear the screen
+    for(int x=0; x<win_width; ++x) {
+    	for(int y=0; y<win_width; ++y) {
+	    set_xwd_map_color(id, x,y, 0.0, 0.0, 0.0);
+	}
+    }
     printf("rendering frame %d\n", fnum);
 
 
@@ -520,22 +525,17 @@ int main ()
 
 
 
-    G_display_image();
+    sprintf(filename, "pointcloudimg2%04d.xwd", fnum);
+    xwd_map_to_named_xwd_file(id, filename);
 
-    sprintf(filename, "pointcloudimg%04d.xwd", fnum);
-    G_save_image_to_file(filename);
-
-
-    if(G_wait_key() == 'q' || fnum >= max_fnum) {
-      break;
-    }
 
 
     fnum++ ;
+    if(fnum > max_fnum) {
+	    break;
+    }
   } // end while (1)
 
-
-  while ('q' != G_wait_key()) {}
 
 
 }

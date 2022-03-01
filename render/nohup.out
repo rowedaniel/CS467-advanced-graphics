@@ -1,0 +1,6 @@
+Command terminated by signal 2
+11.20user 0.01system 0:11.22elapsed 99%CPU (0avgtext+0avgdata 43992maxresident)k
+0inputs+0outputs (0major+10533minor)pagefaults 0swaps
+Command terminated by signal 15
+586.48user 0.13system 9:47.34elapsed 99%CPU (0avgtext+0avgdata 44200maxresident)k
+0inputs+59136outputs (0major+10534minor)pagefaults 0swaps
