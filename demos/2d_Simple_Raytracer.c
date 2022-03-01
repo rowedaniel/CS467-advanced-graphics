@@ -1,6 +1,7 @@
 #include "FPToolkit.c"
 #include "M3d_matrix_tools.c"
 
+#define M_YON 600
 
 double obmat[100][4][4] ;
 double obinv[100][4][4] ;
@@ -59,15 +60,15 @@ void Draw_the_scene()
 
 int solve_quadratic(double a, double b, double c, double t[2])
 {
-  const double tmp = b*b-4*a*c;
-  if(tmp < 0) {
+  const double discriminant = b*b-4*a*c;
+  if(discriminant< 0) {
 	  return 0;
-  } else if(tmp == 0) {
-	  t[0] = -b / (2 * a);
+  } else if(discriminant== 0) {
+	  t[0] = -b + sqrt(discriminant) / (2 * a);
 	  return 1;
   }
-  t[0] = (-b + sqrt(tmp)) / (2 * a);
-  t[1] = (-b - sqrt(tmp)) / (2 * a);
+  t[0] = (-b + sqrt(discriminant)) / (2 * a);
+  t[1] = (-b - sqrt(discriminant)) / (2 * a);
   return 2;
   
 }
@@ -78,44 +79,44 @@ int ray(double Rsource[3], double Rtip[3], double argb[3])
   argb[1] = 1;
   argb[2] = 1;
 
-  double t_closest = 1e5;
+  double t_closest = M_YON + 1;
 
   // line = start + a*change
-  double change[3];
-  double start[3];
 
-  // calculate and start
-  M3d_vector_mult_const(change, Rsource, -1);
-  M3d_vector_add(change, change, Rtip);
-  M3d_vector_copy(start, Rsource);
-
-  for(int onum = num_objects-2; onum < num_objects; ++onum) {
-
+  for(int onum = 0; onum < num_objects; ++onum) {
+    double tip[3];
+    double start[3];
+  
+    // calculate and start
+    M3d_vector_copy(start, Rsource);
+    M3d_vector_copy(tip, Rtip);
 
     // transform line to object space
-    start[0] = (start[0]-400) / 100;
-    start[1] = (start[1]-400) / 100;
-    change[0] = (change[0]-400) / 100;
-    change[0] = (change[0]-400) / 100;
-    //M3d_mat_mult_pt(start, obinv[onum], start);
-    //M3d_mat_mult_pt(change, obinv[onum], change);
+    M3d_mat_mult_pt(start, obinv[onum], start);
+    M3d_mat_mult_pt(tip, obinv[onum], tip);
+
+    // subtract start from change
+    double change[3];
+    M3d_vector_mult_const(change, start, -1);
+    M3d_vector_add(change, change, tip);
+
 
     // solve quadratic (only works for objects which started as unit sphere)
     double t[2];
-    /*
     double a = M3d_magnitude(change); a = a*a;
     double b = 2*M3d_dot_product(start, change);
     double c = M3d_magnitude(start); c = c*c -1;
-    */
+    /*
     double a = change[0]*change[0] + change[1]*change[1];
     double b = 2*(start[0]*change[0] + start[1]*change[1]);
     double c = (start[0]*start[0] + start[1]*start[1]) - 1;
+    */
     int num_solutions = solve_quadratic(a, b, c,  t);
 		   		        
     // find closest solution
     for(int i = 0; i < num_solutions; ++i) {
-	    printf("solution! %lf\n", t[i]);
 	    if(t[i] < 0) {
+		    printf("huh, negative value for solution\n");
 		    continue;
 	    }
 	    if(t[i] < t_closest) {
@@ -127,23 +128,21 @@ int ray(double Rsource[3], double Rtip[3], double argb[3])
 
     }
 
-    /*
-    // transform line back to world space
-    M3d_mat_mult_pt(start, obmat[onum], start);
-    M3d_mat_mult_pt(change, obmat[onum], change);
-    */
+  }
 
+  if(t_closest > M_YON) {
+	  return 0;
   }
 
   // (re) calculate and start
+  double change[3];
   M3d_vector_mult_const(change, Rsource, -1);
   M3d_vector_add(change, change, Rtip);
-  M3d_vector_copy(start, Rsource);
 
   // finally, add to get back point
   double point[3] = {0,0,0};
   M3d_vector_mult_const(point, change, t_closest);
-  M3d_vector_add(point, start, point);
+  M3d_vector_add(point, Rsource, point);
   
 
   // finally, draw
