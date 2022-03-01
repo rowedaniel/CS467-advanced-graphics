@@ -63,54 +63,92 @@ int solve_quadratic(double a, double b, double c, double t[2])
   if(tmp < 0) {
 	  return 0;
   } else if(tmp == 0) {
-	  t[0] = -b / 2 / a;
+	  t[0] = -b / (2 * a);
 	  return 1;
   }
-  t[0] = (-b + sqrt(tmp)) / 2 / a;
-  t[1] = (-b - sqrt(tmp)) / 2 / a;
+  t[0] = (-b + sqrt(tmp)) / (2 * a);
+  t[1] = (-b - sqrt(tmp)) / (2 * a);
   return 2;
   
 }
 
 int ray(double Rsource[3], double Rtip[3], double argb[3])
 {
+  argb[0] = 1;
+  argb[1] = 1;
+  argb[2] = 1;
 
-  for(int onum = 0; onum < num_objects; ++onum) {
+  double t_closest = 1e5;
 
-    double change[3];
-    double start[3];
-    // line = start + a*change
-    M3d_vector_mult_const(change, Rsource, -1);
-    M3d_vector_add(change, change, Rtip);
+  // line = start + a*change
+  double change[3];
+  double start[3];
+
+  // calculate and start
+  M3d_vector_mult_const(change, Rsource, -1);
+  M3d_vector_add(change, change, Rtip);
+  M3d_vector_copy(start, Rsource);
+
+  for(int onum = num_objects-2; onum < num_objects; ++onum) {
+
 
     // transform line to object space
-    M3d_mat_mult_pt(start, obinv[onum], start);
-    M3d_mat_mult_pt(change, obinv[onum], change);
+    start[0] = (start[0]-400) / 100;
+    start[1] = (start[1]-400) / 100;
+    change[0] = (change[0]-400) / 100;
+    change[0] = (change[0]-400) / 100;
+    //M3d_mat_mult_pt(start, obinv[onum], start);
+    //M3d_mat_mult_pt(change, obinv[onum], change);
 
     // solve quadratic (only works for objects which started as unit sphere)
     double t[2];
-    int num_solutions = solve_quadratic(M3d_magnitude(change),  2*M3d_dot_product(start, change), M3d_magnitude(start)-1, t);
-    if(num_solutions == 0) {
-	    // no point
-	    continue;
-    }
-
+    /*
+    double a = M3d_magnitude(change); a = a*a;
+    double b = 2*M3d_dot_product(start, change);
+    double c = M3d_magnitude(start); c = c*c -1;
+    */
+    double a = change[0]*change[0] + change[1]*change[1];
+    double b = 2*(start[0]*change[0] + start[1]*change[1]);
+    double c = (start[0]*start[0] + start[1]*start[1]) - 1;
+    int num_solutions = solve_quadratic(a, b, c,  t);
+		   		        
     // find closest solution
-    double t_closest;
-    if(num_solutions > 1) {
-	    t_closest = fmin(t[0], t[1]);
-    }
-    double point[3];
-    M3d_vector_mult_const(point, change, t[0]);
-    M3d_vector_add(point, start, point);
-    
-    // transform back to world space
-    M3d_mat_mult_pt(point, obmat[onum], point);
+    for(int i = 0; i < num_solutions; ++i) {
+	    printf("solution! %lf\n", t[i]);
+	    if(t[i] < 0) {
+		    continue;
+	    }
+	    if(t[i] < t_closest) {
+	      t_closest = t[i];
+	      for(int j=0; j<3; ++j) {
+	      	argb[j] = color[onum][j];
+	      }
+	    }
 
-    // finally, draw
-    G_rgb(0.4, 0.8, 0.9);
-    G_line(Rsource[0], Rsource[1], point[0], point[1]);
+    }
+
+    /*
+    // transform line back to world space
+    M3d_mat_mult_pt(start, obmat[onum], start);
+    M3d_mat_mult_pt(change, obmat[onum], change);
+    */
+
   }
+
+  // (re) calculate and start
+  M3d_vector_mult_const(change, Rsource, -1);
+  M3d_vector_add(change, change, Rtip);
+  M3d_vector_copy(start, Rsource);
+
+  // finally, add to get back point
+  double point[3] = {0,0,0};
+  M3d_vector_mult_const(point, change, t_closest);
+  M3d_vector_add(point, start, point);
+  
+
+  // finally, draw
+  G_rgb(argb[0], argb[1], argb[2]);
+  G_line(Rtip[0], Rtip[1], point[0], point[1]);
 }
 
 
@@ -196,6 +234,22 @@ int test01()
     Ttypelist[Tn] = RZ ; Tvlist[Tn] =  -15   ; Tn++ ;
     Ttypelist[Tn] = TX ; Tvlist[Tn] =  100   ; Tn++ ;
     Ttypelist[Tn] = TY ; Tvlist[Tn] =  700   ; Tn++ ;
+	
+    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+    M3d_mat_mult(obmat[num_objects], vm, m) ;
+    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+
+    num_objects++ ; // don't forget to do this        
+    //////////////////////////////////////////////////////////////
+    color[num_objects][0] = 0.5 ;
+    color[num_objects][1] = 0.5 ; 
+    color[num_objects][2] = 0.5 ;
+	
+    Tn = 0 ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  100   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  100   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  400   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  400   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;

@@ -262,6 +262,12 @@ int M3d_print_vector(double a[3])
 	printf("\n");
 }
 
+double M3d_vector_copy(double a[3], double b[3]) {
+	for(int i=0; i<3; ++i) {
+		a[i] = b[i];
+	}
+}
+
 double M3d_dot_product(double a[3], double b[3]) {
 	return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
 }
