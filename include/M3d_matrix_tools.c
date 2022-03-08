@@ -288,7 +288,7 @@ int M3d_vector_add(double res[3], double a[3], double b[3]) {
 	}
 }
 
-int M3d_make_unit(double res[3], double a[3]) {
+int M3d_normalize(double res[3], double a[3]) {
 	double magnitude = M3d_magnitude(a);
 	M3d_vector_mult_const(res, a, 1/magnitude);
 }
