@@ -97,11 +97,8 @@ int get_normal(double normal[3], int onum, double intersection[3]) {
   M3d_normalize(normal, normal);
 }
 
-int ray(double Rsource[3], double Rtip[3], double argb[3])
+int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 {
-  argb[0] = 1;
-  argb[1] = 1;
-  argb[2] = 1;
 
   double t_closest = M_YON + 1;
   int saved_onum = -1;
@@ -137,7 +134,7 @@ int ray(double Rsource[3], double Rtip[3], double argb[3])
     // find closest solution
     for(int i = 0; i < num_solutions; ++i) {
 	    if(t[i] < 0) {
-		    printf("huh, negative value for solution\n");
+		    //printf("huh, negative value for solution\n");
 		    continue;
 	    }
 	    if(t[i] < t_closest) {
@@ -172,6 +169,16 @@ int ray(double Rsource[3], double Rtip[3], double argb[3])
   double normal[3];
   get_normal(normal, saved_onum, point);
 
+  // recurse!
+  if (n > 0) {
+    double tip[3];
+    // TODO: don't recurse with normal, normal is the bijection!
+    // what you WANT is line with angle 2*theta, where theta is the angle between start ray
+    // and normal ray. In other words, REFLECT SOURCE LINE OVER NORMAL
+    M3d_vector_add(tip, point, normal);
+    ray_recursive(point, tip, argb, n-1);
+  }
+
 
 
 
@@ -179,7 +186,12 @@ int ray(double Rsource[3], double Rtip[3], double argb[3])
   G_rgb(argb[0], argb[1], argb[2]);
   G_circle(Rtip[0], Rtip[1], 2);
   G_line(Rtip[0], Rtip[1], point[0], point[1]);
-  G_line(point[0], point[1], point[0] + 20*normal[0], point[1] + 20*normal[1]);
+  //G_line(point[0], point[1], point[0] + 20*normal[0], point[1] + 20*normal[1]);
+}
+
+int ray(double Rsource[3], double Rtip[3], double argb[3])
+{
+  ray_recursive(Rsource, Rtip, argb, 1);
 }
 
 
