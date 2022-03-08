@@ -6,10 +6,10 @@
 double obmat[100][4][4] ;
 double obinv[100][4][4] ;
 double color[100][3] ;
-int (*grad[100])(int onum, double normal[3], double intersection[3]);
+int (*grad[100])(double normal[3], double intersection[3]);
 int    num_objects ;
 
-//  grad[onum](onum, normal, intersection);
+
 
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
@@ -18,16 +18,6 @@ int    num_objects ;
 
 
 
-  // define gradient
-int circle_grad(int onum, double normal[3], double intersection[3]) {
-    printf("calculating gradient for: %i\n", onum);
-    // calculate gradient
-    double gradient[3];
-    // for circles, gradient is <2x, 2y>
-    M3d_mat_mult_pt(gradient, obinv[onum], intersection);
-    M3d_vector_mult_const(gradient, gradient, 2);
-  
-  }
 
 
 void Draw_ellipsoid (int onum)
@@ -50,6 +40,16 @@ void Draw_ellipsoid (int onum)
     G_point(x,y) ;
   }
 
+  // define gradient
+  int circle_grad(double normal[3], double intersection[3]) {
+    printf("calculating gradient for: %i\n", onum);
+    // calculate gradient
+    double gradient[3];
+    // for circles, gradient is <2x, 2y>
+    M3d_mat_mult_pt(gradient, obinv[onum], intersection);
+    M3d_vector_mult_const(gradient, gradient, 2);
+  
+  }
   printf("initing object %i to circle\n", onum);
   grad[onum] = circle_grad;
 
@@ -92,7 +92,7 @@ int get_normal(double normal[3], int onum, double intersection[3]) {
   // get gradient
   printf("calculating normal for: %i\n", onum);
   double gradient[3];
-  grad[onum](onum, normal, intersection);
+  grad[onum](normal, intersection);
 
   // finally, transform back into object space
   normal[0] = obinv[onum][0][0]*gradient[0] + obinv[onum][1][0]*gradient[1];
