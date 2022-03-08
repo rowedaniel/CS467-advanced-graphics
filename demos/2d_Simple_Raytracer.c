@@ -6,7 +6,7 @@
 double obmat[100][4][4] ;
 double obinv[100][4][4] ;
 double color[100][3] ;
-int (*grad[100])(double normal[3], double intersection[3]);
+int (*grad[100])(double gradient[3], int onum, double intersection[3]);
 int    num_objects ;
 
 
@@ -18,6 +18,14 @@ int    num_objects ;
 
 
 
+// define gradient
+int circle_grad(double gradient[3], int onum, double intersection[3]) {
+  // calculate gradient
+  // for circles, gradient is <2x, 2y>
+  M3d_mat_mult_pt(gradient, obinv[onum], intersection);
+  M3d_vector_mult_const(gradient, gradient, 2);
+
+}
 
 
 void Draw_ellipsoid (int onum)
@@ -40,18 +48,6 @@ void Draw_ellipsoid (int onum)
     G_point(x,y) ;
   }
 
-  // define gradient
-  int circle_grad(double normal[3], double intersection[3]) {
-    printf("calculating gradient for: %i\n", onum);
-    // calculate gradient
-    double gradient[3];
-    // for circles, gradient is <2x, 2y>
-    M3d_mat_mult_pt(gradient, obinv[onum], intersection);
-    M3d_vector_mult_const(gradient, gradient, 2);
-  
-  }
-  printf("initing object %i to circle\n", onum);
-  grad[onum] = circle_grad;
 
 }
 
@@ -90,9 +86,8 @@ int solve_quadratic(double a, double b, double c, double t[2])
 
 int get_normal(double normal[3], int onum, double intersection[3]) {
   // get gradient
-  printf("calculating normal for: %i\n", onum);
   double gradient[3];
-  grad[onum](normal, intersection);
+  grad[onum](gradient, onum, intersection);
 
   // finally, transform back into object space
   normal[0] = obinv[onum][0][0]*gradient[0] + obinv[onum][1][0]*gradient[1];
@@ -223,6 +218,7 @@ int test01()
     M3d_mat_mult(obmat[num_objects], vm, m) ;
     M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
+    grad[num_objects] = circle_grad;
     num_objects++ ; // don't forget to do this
 
     //////////////////////////////////////////////////////////////
@@ -241,6 +237,7 @@ int test01()
     M3d_mat_mult(obmat[num_objects], vm, m) ;
     M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
+    grad[num_objects] = circle_grad;
     num_objects++ ; // don't forget to do this
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.3 ;
@@ -258,6 +255,7 @@ int test01()
     M3d_mat_mult(obmat[num_objects], vm, m) ;
     M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
+    grad[num_objects] = circle_grad;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.5 ;
@@ -275,6 +273,7 @@ int test01()
     M3d_mat_mult(obmat[num_objects], vm, m) ;
     M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
+    grad[num_objects] = circle_grad;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.5 ;
@@ -291,6 +290,7 @@ int test01()
     M3d_mat_mult(obmat[num_objects], vm, m) ;
     M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
+    grad[num_objects] = circle_grad;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
 
