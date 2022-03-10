@@ -7,6 +7,7 @@ double obmat[100][4][4] ;
 double obinv[100][4][4] ;
 double color[100][3] ;
 int (*grad[100])(double gradient[3], int onum, double intersection[3]);
+void (*draw[100])(int onum);
 int    num_objects ;
 
 
@@ -24,7 +25,14 @@ int circle_grad(double gradient[3], int onum, double intersection[3]) {
   // for circles, gradient is <2x, 2y>
   M3d_mat_mult_pt(gradient, obinv[onum], intersection);
   M3d_vector_mult_const(gradient, gradient, 2);
+}
 
+int line_segment_grad(double gradient[3], int onum, double intersection[3]) {
+  printf("HI\n");
+  gradient[0] = 0;
+  gradient[1] = 1;
+  gradient[2] = 0;
+  //M3d_mat_mult_pt(gradient, obinv[onum], gradient);
 }
 
 
@@ -47,8 +55,27 @@ void Draw_ellipsoid (int onum)
     y = xyz[1] ;
     G_point(x,y) ;
   }
+}
 
+void Draw_line (int onum)
+{
+  int n,i ;
+  double t, xyz[3] ;
+  double x,y ;
 
+  G_rgb (color[onum][0],color[onum][1],color[onum][2]) ;
+  
+  n = 1000 ;
+  for (i = 0 ; i < n ; i++) {
+    t = i * 1.0 / n ;
+    xyz[0] = t ;
+    xyz[1] = 0 ;
+    xyz[2] = 0 ;
+    M3d_mat_mult_pt(xyz, obmat[onum], xyz) ;
+    x = xyz[0] ;
+    y = xyz[1] ;
+    G_point(x,y) ;
+  }
 }
 
 
@@ -58,7 +85,7 @@ void Draw_the_scene()
 {
   int onum ;
   for (onum = 0 ; onum < num_objects ; onum++) {
-    Draw_ellipsoid(onum) ;
+    draw[onum](onum) ;
   }
 }
 
@@ -90,9 +117,9 @@ int get_normal(double normal[3], int onum, double intersection[3]) {
   grad[onum](gradient, onum, intersection);
 
   // finally, transform back into object space
-  normal[0] = obinv[onum][0][0]*gradient[0] + obinv[onum][1][0]*gradient[1];
-  normal[1] = obinv[onum][0][1]*gradient[0] + obinv[onum][1][1]*gradient[1];
-  normal[2] = 0;
+  double inv_T[4][4];
+  M3d_transpose(inv_T, obinv[onum]);
+  M3d_mat_mult_pt(normal, inv_T, gradient);
 
   M3d_normalize(normal, normal);
 }
@@ -134,7 +161,6 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
     // find closest solution
     for(int i = 0; i < num_solutions; ++i) {
 	    if(t[i] < 0) {
-		    //printf("huh, negative value for solution\n");
 		    continue;
 	    }
 	    if(t[i] < t_closest) {
@@ -155,43 +181,74 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 	  return 0;
   }
 
-  // (re) calculate and start
+  // (re) calculate change and start
   double change[3];
   M3d_vector_mult_const(change, Rsource, -1);
   M3d_vector_add(change, change, Rtip);
 
-  // finally, add to get back point
+  // add to get tip
   double point[3] = {0,0,0};
+  // reduce t_closest slightly to avoid z-fighting
+  t_closest *= 0.999;
   M3d_vector_mult_const(point, change, t_closest);
   M3d_vector_add(point, Rsource, point);
-  
-  // calculate normal
-  double normal[3];
-  get_normal(normal, saved_onum, point);
 
   // recurse!
   if (n > 0) {
+    // calculate normal
+    double normal[3];
+    get_normal(normal, saved_onum, point);
+
+    G_rgb(1,1,0);
+    G_line(point[0], point[1], point[0]+normal[0]*20, point[1]+normal[1]*20);
+
+    // calculate reflection angle
+    // get transformation matrix to reflect across plane defined by normal vector
+    double T[4][4], tmp[4][4];
+    double reflect[4][4] = {
+      {1 - 2*normal[0]*normal[0],   -2*normal[0]*normal[1],    -2*normal[0]*normal[2], 0},
+      {-2*normal[0]*normal[1],   1 - 2*normal[1]*normal[1],    -2*normal[1]*normal[2], 0},
+      {-2*normal[0]*normal[2],      -2*normal[1]*normal[2], 1 - 2*normal[2]*normal[2], 0},
+      {0, 0, 0, 0}
+       };
+
+    M3d_make_translation(T, -point[0], -point[1], -point[2]);
+    M3d_make_scaling(tmp, -1, -1, -1);
+    M3d_mat_mult(T, tmp, T);
+    M3d_mat_mult(T, reflect, T);
+    M3d_make_translation(tmp, point[0], point[1], point[2]);
+    M3d_mat_mult(T, tmp, T);
+
+
+
+    // multiply by matrix, and then add to get new tip
     double tip[3];
-    // TODO: don't recurse with normal, normal is the bijection!
-    // what you WANT is line with angle 2*theta, where theta is the angle between start ray
-    // and normal ray. In other words, REFLECT SOURCE LINE OVER NORMAL
-    M3d_vector_add(tip, point, normal);
+    M3d_mat_mult_pt(tip, T, Rtip);
+    M3d_normalize(tip, tip);
+
+    //G_rgb(1,1,1);
+    //G_line(point[0], point[1], point[0]+tip[0], point[1]+tip[1]);
+
+    M3d_vector_add(tip, point, tip);
+
+
     ray_recursive(point, tip, argb, n-1);
   }
 
 
 
+  
 
-  // finally, draw
+  // draw
   G_rgb(argb[0], argb[1], argb[2]);
   G_circle(Rtip[0], Rtip[1], 2);
   G_line(Rtip[0], Rtip[1], point[0], point[1]);
-  //G_line(point[0], point[1], point[0] + 20*normal[0], point[1] + 20*normal[1]);
+
 }
 
 int ray(double Rsource[3], double Rtip[3], double argb[3])
 {
-  ray_recursive(Rsource, Rtip, argb, 1);
+  ray_recursive(Rsource, Rtip, argb, 10);
 }
 
 
@@ -230,7 +287,8 @@ int test01()
     M3d_mat_mult(obmat[num_objects], vm, m) ;
     M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
-    grad[num_objects] = circle_grad;
+    grad[num_objects] = line_segment_grad;
+    draw[num_objects] = Draw_line;
     num_objects++ ; // don't forget to do this
 
     //////////////////////////////////////////////////////////////
@@ -250,6 +308,7 @@ int test01()
     M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
     grad[num_objects] = circle_grad;
+    draw[num_objects] = Draw_ellipsoid;
     num_objects++ ; // don't forget to do this
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.3 ;
@@ -268,6 +327,7 @@ int test01()
     M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
     grad[num_objects] = circle_grad;
+    draw[num_objects] = Draw_ellipsoid;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.5 ;
@@ -286,6 +346,7 @@ int test01()
     M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
     grad[num_objects] = circle_grad;
+    draw[num_objects] = Draw_ellipsoid;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.5 ;
@@ -303,22 +364,13 @@ int test01()
     M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
     grad[num_objects] = circle_grad;
+    draw[num_objects] = Draw_ellipsoid;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
 
     
 
-    G_rgb(0,0,0) ;
-    G_clear() ;
-
-    Draw_the_scene() ;
-    
-    Rsource[0] =  20 ;  Rsource[1] =  400 ;  Rsource[2] = 0 ;    
-    G_rgb(1,0,1) ; G_fill_circle(Rsource[0], Rsource[1], 3) ;
-    G_rgb(1,0,1) ; G_line(100,200,  100,600) ;
-    
-    G_wait_key() ;
-    
+    /*
     double ytip ;
     for (ytip = 200 ; ytip <= 600 ; ytip++) {
       Rtip[0]    = 100 ;  Rtip[1]    = ytip ;  Rtip[2]   = 0  ;    
@@ -329,9 +381,48 @@ int test01()
       Draw_the_scene() ;
       G_wait_key() ;
     }
+    */
 
-    G_rgb(1,1,1) ; G_draw_string("'q' to quit", 50,50) ;
-    while (G_wait_key() != 'q') ;
+
+    Rsource[0] =  20 ;  Rsource[1] =  400 ;  Rsource[2] = 0 ;    
+
+    G_rgb(0,0,0) ;
+    G_clear() ;
+    G_rgb(1,0,1) ; G_fill_circle(Rsource[0], Rsource[1], 3) ;
+    G_rgb(1,0,1) ; G_line(100,200,  100,600) ;
+    Draw_the_scene() ;
+
+
+    while(1)
+    {
+
+
+
+      double p[2];
+      G_wait_click(p);
+      if(p[1] < 50) { break; }
+
+      Rtip[0] = 100;
+      Rtip[1] = (p[1]-Rsource[1]) / (p[0] - Rsource[0]) * (Rtip[0] - Rsource[0]) + Rsource[1];
+      Rtip[2] = 0;
+
+
+
+      // redraw screen
+      G_rgb(0,0,0) ;
+      G_clear() ;
+  
+      G_rgb(1,0,1) ; G_fill_circle(Rsource[0], Rsource[1], 3) ;
+      G_rgb(1,0,1) ; G_line(100,200,  100,600) ;
+      G_rgb(1,1,1) ; G_draw_string("click here to quit", 50,50) ;
+
+
+      // draw ray
+      G_rgb(1,1,0) ; G_line(Rsource[0],Rsource[1],  Rtip[0],Rtip[1]) ;
+      ray (Rsource, Rtip, argb) ; 
+      Draw_the_scene() ;
+    }
+
     G_save_image_to_file("2d_Simple_Raytracer.xwd") ;
 }
 

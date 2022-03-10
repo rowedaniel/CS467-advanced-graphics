@@ -294,6 +294,19 @@ int M3d_normalize(double res[3], double a[3]) {
 }
 
 
+int M3d_transpose(double a[4][4], double b[4][4])
+{
+  double tmp[4][4];
+  M3d_copy_mat(tmp, b);
+
+  for(int i=0; i<4; ++i) {
+    for(int j=0; j<4; ++j) {
+      a[j][i] = tmp[i][j];
+    }
+  }
+}
+
+
 
 
 
