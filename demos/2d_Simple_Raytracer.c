@@ -1,13 +1,14 @@
 #include "FPToolkit.c"
 #include "M3d_matrix_tools.c"
 
-#define M_YON 600
+#define M_YON 10000
 
 double obmat[100][4][4] ;
 double obinv[100][4][4] ;
 double color[100][3] ;
 int (*grad[100])(double gradient[3], int onum, double intersection[3]);
 void (*draw[100])(int onum);
+double (*intersection[100])(double start[3], double change[3]);
 int    num_objects ;
 
 
@@ -17,24 +18,53 @@ int    num_objects ;
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
+int solve_quadratic(double a, double b, double c, double t[2])
+{
+  const double discriminant = b*b-4*a*c;
+  if(discriminant< 0) {
+	  return 0;
+  } else if(discriminant== 0) {
+	  t[0] = -b + sqrt(discriminant) / (2 * a);
+	  return 1;
+  }
+  t[0] = (-b + sqrt(discriminant)) / (2 * a);
+  t[1] = (-b - sqrt(discriminant)) / (2 * a);
+  return 2;
+  
+}
 
 
-// define gradient
+
+// ================ Circle stuff ===============
 int circle_grad(double gradient[3], int onum, double intersection[3]) {
-  // calculate gradient
   // for circles, gradient is <2x, 2y>
   M3d_mat_mult_pt(gradient, obinv[onum], intersection);
   M3d_vector_mult_const(gradient, gradient, 2);
 }
 
-int line_segment_grad(double gradient[3], int onum, double intersection[3]) {
-  printf("HI\n");
-  gradient[0] = 0;
-  gradient[1] = 1;
-  gradient[2] = 0;
-  //M3d_mat_mult_pt(gradient, obinv[onum], gradient);
-}
+double circle_intersection(double start[3], double change[3])
+{
+  // solve quadratic (only works for objects which started as unit sphere)
+  double a = M3d_dot_product(change, change);
+  double b = 2*M3d_dot_product(start, change);
+  double c = M3d_dot_product(start, start) -1;
 
+  double t[2];
+  double t_closest = M_YON + 1;
+  int num_solutions = solve_quadratic(a, b, c,  t);
+
+  // find closest solution
+  for(int i = 0; i < num_solutions; ++i) {
+    if(t[i] < 0) {
+      continue;
+    }
+    if(t[i] < t_closest) {
+      t_closest = t[i];
+    }
+  }
+
+  return t_closest;
+}
 
 void Draw_ellipsoid (int onum)
 {
@@ -57,7 +87,38 @@ void Draw_ellipsoid (int onum)
   }
 }
 
-void Draw_line (int onum)
+// ==========================================================================
+
+
+// ============================ line segment stuff ==========================================
+int line_segment_grad(double gradient[3], int onum, double intersection[3]) {
+  gradient[0] = 0;
+  gradient[1] = 1;
+  gradient[2] = 0;
+}
+
+double line_segment_intersection(double start[3], double change[3])
+{
+  double t = -1;
+  if(!(change[1] == 0)) { 
+    t =  -start[1]/change[1] ;
+  } /*else if(!(change[2] != 0)) { 
+    t = -start[2]/change[2];
+  } */
+  if(t < 0) {
+    return M_YON + 1;
+  }
+
+  const double x = start[0] + t * change[0];
+  if((x < 0) || (x > 1)) {
+    return M_YON + 1;
+  }
+
+  return t;
+}
+
+
+void Draw_line_segment (int onum)
 {
   int n,i ;
   double t, xyz[3] ;
@@ -67,7 +128,7 @@ void Draw_line (int onum)
   
   n = 1000 ;
   for (i = 0 ; i < n ; i++) {
-    t = i * 1.0 / n ;
+    t = i * 1.0 /  n ;
     xyz[0] = t ;
     xyz[1] = 0 ;
     xyz[2] = 0 ;
@@ -77,6 +138,9 @@ void Draw_line (int onum)
     G_point(x,y) ;
   }
 }
+// ==========================================================================
+
+
 
 
 
@@ -95,20 +159,6 @@ void Draw_the_scene()
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-int solve_quadratic(double a, double b, double c, double t[2])
-{
-  const double discriminant = b*b-4*a*c;
-  if(discriminant< 0) {
-	  return 0;
-  } else if(discriminant== 0) {
-	  t[0] = -b + sqrt(discriminant) / (2 * a);
-	  return 1;
-  }
-  t[0] = (-b + sqrt(discriminant)) / (2 * a);
-  t[1] = (-b - sqrt(discriminant)) / (2 * a);
-  return 2;
-  
-}
 
 
 int get_normal(double normal[3], int onum, double intersection[3]) {
@@ -150,30 +200,16 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
     M3d_vector_mult_const(change, start, -1);
     M3d_vector_add(change, change, tip);
 
-
-    // solve quadratic (only works for objects which started as unit sphere)
-    double t[2];
-    double a = M3d_dot_product(change, change);
-    double b = 2*M3d_dot_product(start, change);
-    double c = M3d_dot_product(start, start) -1;
-    int num_solutions = solve_quadratic(a, b, c,  t);
-
-    // find closest solution
-    for(int i = 0; i < num_solutions; ++i) {
-	    if(t[i] < 0) {
-		    continue;
-	    }
-	    if(t[i] < t_closest) {
-        // new closest point! Save this one.
-	      t_closest = t[i];
-        saved_onum = onum;
-	      for(int j=0; j<3; ++j) {
-	      	argb[j] = color[onum][j];
-	      }
-
-	    }
-
+    double t = intersection[onum](start, change);
+    if(t < t_closest) {
+      // new closest point! Save this one.
+      t_closest = t;
+      saved_onum = onum;
+      for(int j=0; j<3; ++j) {
+        argb[j] = color[onum][j];
+      }
     }
+
 
   }
 
@@ -193,6 +229,13 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
   M3d_vector_mult_const(point, change, t_closest);
   M3d_vector_add(point, Rsource, point);
 
+  // draw
+  G_rgb(argb[0], argb[1], argb[2]);
+  G_circle(Rtip[0], Rtip[1], 2);
+  G_line(Rtip[0], Rtip[1], point[0], point[1]);
+
+
+
   // recurse!
   if (n > 0) {
     // calculate normal
@@ -204,51 +247,37 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 
     // calculate reflection angle
     // get transformation matrix to reflect across plane defined by normal vector
-    double T[4][4], tmp[4][4];
-    double reflect[4][4] = {
-      {1 - 2*normal[0]*normal[0],   -2*normal[0]*normal[1],    -2*normal[0]*normal[2], 0},
-      {-2*normal[0]*normal[1],   1 - 2*normal[1]*normal[1],    -2*normal[1]*normal[2], 0},
-      {-2*normal[0]*normal[2],      -2*normal[1]*normal[2], 1 - 2*normal[2]*normal[2], 0},
-      {0, 0, 0, 0}
-       };
+    double look[3], reflection[3];
+    // look = intersection - source
+    M3d_vector_mult_const(look, Rsource, -1);
+    M3d_vector_add(look, look, point);
+    M3d_normalize(look, look);
 
-    M3d_make_translation(T, -point[0], -point[1], -point[2]);
-    M3d_make_scaling(tmp, -1, -1, -1);
-    M3d_mat_mult(T, tmp, T);
-    M3d_mat_mult(T, reflect, T);
-    M3d_make_translation(tmp, point[0], point[1], point[2]);
-    M3d_mat_mult(T, tmp, T);
+    // reflection = look - 2(look * normal)normal
+    M3d_vector_mult_const(reflection, normal, -2*M3d_dot_product(look, normal));
+    M3d_vector_add(reflection, reflection, look);
 
+    // new tip = reflection + intersection
+    double new_tip[3];
+    M3d_vector_add(new_tip, reflection, point);
 
 
-    // multiply by matrix, and then add to get new tip
-    double tip[3];
-    M3d_mat_mult_pt(tip, T, Rtip);
-    M3d_normalize(tip, tip);
+    G_rgb(1,1,1);
+    G_line(point[0], point[1], new_tip[0], new_tip[1]);
 
-    //G_rgb(1,1,1);
-    //G_line(point[0], point[1], point[0]+tip[0], point[1]+tip[1]);
-
-    M3d_vector_add(tip, point, tip);
-
-
-    ray_recursive(point, tip, argb, n-1);
+    ray_recursive(point, new_tip, argb, n-1);
   }
 
 
 
   
 
-  // draw
-  G_rgb(argb[0], argb[1], argb[2]);
-  G_circle(Rtip[0], Rtip[1], 2);
-  G_line(Rtip[0], Rtip[1], point[0], point[1]);
 
 }
 
 int ray(double Rsource[3], double Rtip[3], double argb[3])
 {
-  ray_recursive(Rsource, Rtip, argb, 10);
+  ray_recursive(Rsource, Rtip, argb, 100);
 }
 
 
@@ -272,13 +301,12 @@ int test01()
 
     //////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 0.0 ;
-    color[num_objects][1] = 0.8 ; 
-    color[num_objects][2] = 0.0 ;
+    color[num_objects][0] = 0.4 ;
+    color[num_objects][1] = 0.2 ; 
+    color[num_objects][2] = 0.6 ;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =   60   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  100   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  100   ; Tn++ ;
     Ttypelist[Tn] = RZ ; Tvlist[Tn] =   25   ; Tn++ ;
     Ttypelist[Tn] = TX ; Tvlist[Tn] =  300   ; Tn++ ;
     Ttypelist[Tn] = TY ; Tvlist[Tn] =  200   ; Tn++ ;
@@ -288,7 +316,28 @@ int test01()
     M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
     grad[num_objects] = line_segment_grad;
-    draw[num_objects] = Draw_line;
+    draw[num_objects] = Draw_line_segment;
+    intersection[num_objects] = line_segment_intersection;
+    num_objects++ ; // don't forget to do this
+
+    //////////////////////////////////////////////////////////////
+    color[num_objects][0] = 0.0 ;
+    color[num_objects][1] = 0.8 ; 
+    color[num_objects][2] = 0.0 ;
+	
+    Tn = 0 ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  160   ; Tn++ ;
+    Ttypelist[Tn] = RZ ; Tvlist[Tn] =   25   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  280   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  160   ; Tn++ ;
+	
+    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+    M3d_mat_mult(obmat[num_objects], vm, m) ;
+    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+
+    grad[num_objects] = line_segment_grad;
+    draw[num_objects] = Draw_line_segment;
+    intersection[num_objects] = line_segment_intersection;
     num_objects++ ; // don't forget to do this
 
     //////////////////////////////////////////////////////////////
@@ -309,6 +358,7 @@ int test01()
 
     grad[num_objects] = circle_grad;
     draw[num_objects] = Draw_ellipsoid;
+    intersection[num_objects] = circle_intersection;
     num_objects++ ; // don't forget to do this
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.3 ;
@@ -328,6 +378,7 @@ int test01()
 
     grad[num_objects] = circle_grad;
     draw[num_objects] = Draw_ellipsoid;
+    intersection[num_objects] = circle_intersection;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.5 ;
@@ -347,6 +398,7 @@ int test01()
 
     grad[num_objects] = circle_grad;
     draw[num_objects] = Draw_ellipsoid;
+    intersection[num_objects] = circle_intersection;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.5 ;
@@ -365,6 +417,7 @@ int test01()
 
     grad[num_objects] = circle_grad;
     draw[num_objects] = Draw_ellipsoid;
+    intersection[num_objects] = circle_intersection;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
 
