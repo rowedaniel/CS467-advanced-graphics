@@ -141,6 +141,73 @@ void Draw_line_segment (int onum)
 // ==========================================================================
 
 
+// ============================ hyperboloid stuff ==========================================
+int hyperbola_grad(double gradient[3], int onum, double intersection[3]) {
+  // for hyperbola, grad is <2x, -2y>
+  M3d_mat_mult_pt(gradient, obinv[onum], intersection);
+  M3d_vector_mult_const(gradient, gradient, 2);
+  gradient[1] *= -1;
+}
+
+double hyperbola_intersection(double start[3], double change[3])
+{
+  // solve quadratic (only works for objects which started as hyperbola)
+  double change_negY[3] = {change[0], -change[1], change[2]};
+  double start_negY[3] = {start[0], -start[1], start[2]};
+
+  double a = M3d_dot_product(change, change_negY);
+  double b = 2*M3d_dot_product(start, change_negY);
+  double c = M3d_dot_product(start, start_negY) -1;
+
+  double t[2];
+  double t_closest = M_YON + 1;
+  int num_solutions = solve_quadratic(a, b, c,  t);
+
+  // find closest solution
+  for(int i = 0; i < num_solutions; ++i) {
+    if(t[i] < 0) {
+      continue;
+    }
+    // make sure it's in the hyperbola bounds -1 <= y <= 1
+    double y = start[1] + change[1] * t[i];
+    if(-1 > y || y > 1) {
+      continue;
+    }
+
+    if(t[i] < t_closest) {
+      t_closest = t[i];
+    }
+  }
+
+  return t_closest;
+}
+
+
+void Draw_hyperbola(int onum)
+{
+  int n,i ;
+  double t, xyz[3] ;
+  double x,y ;
+
+  G_rgb (color[onum][0],color[onum][1],color[onum][2]) ;
+  
+  n = 1000 ;
+  for (i = 0 ; i < n ; i++) {
+    t = i * 2 * M_PI /  n ;
+    xyz[0] = 1/cos(t) ;
+    xyz[1] = tan(t)   ;
+    xyz[2] = 0 ;
+    if(-1 > xyz[1] || xyz[1] > 1) {
+      continue;
+    }
+    M3d_mat_mult_pt(xyz, obmat[onum], xyz) ;
+    x = xyz[0] ;
+    y = xyz[1] ;
+    G_point(x,y) ;
+  }
+}
+// ==========================================================================
+
 
 
 
@@ -252,6 +319,7 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
     M3d_vector_mult_const(look, Rsource, -1);
     M3d_vector_add(look, look, point);
     M3d_normalize(look, look);
+    M3d_vector_mult_const(look, look, 0.01);
 
     // reflection = look - 2(look * normal)normal
     M3d_vector_mult_const(reflection, normal, -2*M3d_dot_product(look, normal));
@@ -306,9 +374,9 @@ int test01()
     color[num_objects][2] = 0.6 ;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  100   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  240   ; Tn++ ;
     Ttypelist[Tn] = RZ ; Tvlist[Tn] =   25   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  300   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  200   ; Tn++ ;
     Ttypelist[Tn] = TY ; Tvlist[Tn] =  200   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
@@ -326,9 +394,9 @@ int test01()
     color[num_objects][2] = 0.0 ;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  160   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  300   ; Tn++ ;
     Ttypelist[Tn] = RZ ; Tvlist[Tn] =   25   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  280   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  200   ; Tn++ ;
     Ttypelist[Tn] = TY ; Tvlist[Tn] =  160   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
@@ -418,6 +486,26 @@ int test01()
     grad[num_objects] = circle_grad;
     draw[num_objects] = Draw_ellipsoid;
     intersection[num_objects] = circle_intersection;
+    num_objects++ ; // don't forget to do this        
+    //////////////////////////////////////////////////////////////
+    color[num_objects][0] = 0.5 ;
+    color[num_objects][1] = 0.5 ; 
+    color[num_objects][2] = 0.5 ;
+	
+    Tn = 0 ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  15    ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  80   ; Tn++ ;
+    Ttypelist[Tn] = RZ ; Tvlist[Tn] =  -7   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  200   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  630   ; Tn++ ;
+	
+    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+    M3d_mat_mult(obmat[num_objects], vm, m) ;
+    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+
+    grad[num_objects] = hyperbola_grad;
+    draw[num_objects] = Draw_hyperbola;
+    intersection[num_objects] = hyperbola_intersection;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
 
