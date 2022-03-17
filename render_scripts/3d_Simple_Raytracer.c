@@ -3,6 +3,8 @@
 
 #define M_YON 10000
 #define M 100
+#define SCREEN_WIDTH 800
+#define SCREEN_HEIGHT 800
 
 double obmat[M][4][4] ;
 double obinv[M][4][4] ;
@@ -339,163 +341,176 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
     argb[j] = (1-r) * o_color[j] + r * argb[j];
   }
 
-
-
-  
-
-
 }
+
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 
 int ray(double Rsource[3], double Rtip[3], double argb[3])
 {
-  ray_recursive(Rsource, Rtip, argb, 10);
+  ray_recursive(Rsource, Rtip, argb, 2);
 }
 
 
 int screen_to_coords(double point[3], double screen_pos[2]) {
-  point[0] = screen_pos[0] * 2 / 800 - 1;
-  point[1] = screen_pos[1] * 2 / 800 - 1;
+  point[0] = screen_pos[0] * 2 / SCREEN_WIDTH - 1;
+  point[1] = screen_pos[1] * 2 / SCREEN_HEIGHT - 1;
   point[2] = 1;
 }
 
 
+
+
+int Draw_all(double light[3], double eye[3], double coi[3], double up[3])
+{
+  double view_mat[4][4], view_mat_inv[4][4];
+  double argb[3];
+
+  double Rsource[3];
+  M3d_view(view_mat, view_mat_inv, eye, coi, up);
+  M3d_mat_mult_pt(Rsource, view_mat, eye);
+  M3d_mat_mult_pt(light_in_eye_space, view_mat, light);
+
+  for(int i=0; i<SCREEN_WIDTH; ++i) {
+    for(int j=0; j<SCREEN_HEIGHT; ++j) {
+      double screen_pos[2], Rtip[3];
+      screen_pos[0] = i * 1.0;
+      screen_pos[1] = j * 1.0;
+      screen_to_coords(Rtip, screen_pos);
+      M3d_mat_mult_pt(Rtip, view_mat, Rtip);
+
+      ray (Rsource, Rtip, argb) ; 
+      G_rgb(argb[0], argb[1], argb[2]);
+      G_point(screen_pos[0], screen_pos[1]);
+    }
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
+
 int test01()
 {
+  // ======================== Build Objects ==========================
   double vm[4][4], vi[4][4];
   double Tvlist[100];
   int Tn, Ttypelist[100];
   double m[4][4], mi[4][4];
-  double Rsource[3];
-  double Rtip[3];
-  double argb[3] ;
 
-    //////////////////////////////////////////////////////////////////////
-    M3d_make_identity(vm) ;    M3d_make_identity(vi) ; // OVERRIDE for 2d
-    //////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////
+  M3d_make_identity(vm) ;    M3d_make_identity(vi) ; // OVERRIDE for 2d
+  //////////////////////////////////////////////////////////////////////
 
-    num_objects = 0 ;
+  num_objects = 0 ;
 
-    //////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 1.0 ;
-    color[num_objects][1] = 1.0 ; 
-    color[num_objects][2] = 1.0 ;
-    reflectivity[num_objects] = 0.9;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = RY ; Tvlist[Tn] =  60  ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  1   ; Tn++ ;
-    Ttypelist[Tn] = TZ ; Tvlist[Tn] =  2   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+  //////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////
+  color[num_objects][0] = 1.0 ;
+  color[num_objects][1] = 1.0 ; 
+  color[num_objects][2] = 1.0 ;
+  reflectivity[num_objects] = 0.9;
 
-    grad[num_objects] = plane_grad;
-    intersection[num_objects] = plane_intersection;
-    num_objects++ ; // don't forget to do this
-    //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 1.0 ;
-    color[num_objects][1] = 1.0 ; 
-    color[num_objects][2] = 1.0 ;
-    reflectivity[num_objects] = 0.9;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = RY ; Tvlist[Tn] =  -60 ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  -2  ; Tn++ ;
-    Ttypelist[Tn] = TZ ; Tvlist[Tn] =  3   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+  Tn = 0 ;
+  Ttypelist[Tn] = RY ; Tvlist[Tn] =  60  ; Tn++ ;
+  Ttypelist[Tn] = TX ; Tvlist[Tn] =  1   ; Tn++ ;
+  Ttypelist[Tn] = TZ ; Tvlist[Tn] =  2   ; Tn++ ;
 
-    grad[num_objects] = plane_grad;
-    intersection[num_objects] = plane_intersection;
-    num_objects++ ; // don't forget to do this
-    //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 1.0 ;
-    color[num_objects][1] = 0.0 ; 
-    color[num_objects][2] = 0.0 ;
-    reflectivity[num_objects] = 0;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.25   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.25   ; Tn++ ;
-    Ttypelist[Tn] = SZ ; Tvlist[Tn] =  0.25   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  -0.5   ; Tn++ ;
-    Ttypelist[Tn] = TZ ; Tvlist[Tn] =  2      ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+  M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+  M3d_mat_mult(obmat[num_objects], vm, m) ;
+  M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
-    grad[num_objects] = sphere_grad;
-    intersection[num_objects] = sphere_intersection;
-    num_objects++ ; // don't forget to do this
-    //////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////
+  grad[num_objects] = plane_grad;
+  intersection[num_objects] = plane_intersection;
+  num_objects++ ; // don't forget to do this
+  //////////////////////////////////////////////////////////////
+  color[num_objects][0] = 1.0 ;
+  color[num_objects][1] = 1.0 ; 
+  color[num_objects][2] = 1.0 ;
+  reflectivity[num_objects] = 0.9;
+
+  Tn = 0 ;
+  Ttypelist[Tn] = RY ; Tvlist[Tn] =  -60 ; Tn++ ;
+  Ttypelist[Tn] = TX ; Tvlist[Tn] =  -2  ; Tn++ ;
+  Ttypelist[Tn] = TZ ; Tvlist[Tn] =  3   ; Tn++ ;
+
+  M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+  M3d_mat_mult(obmat[num_objects], vm, m) ;
+  M3d_mat_mult(obinv[num_objects], mi, vi) ;
+
+  grad[num_objects] = plane_grad;
+  intersection[num_objects] = plane_intersection;
+  num_objects++ ; // don't forget to do this
+  //////////////////////////////////////////////////////////////
+  color[num_objects][0] = 1.0 ;
+  color[num_objects][1] = 0.0 ; 
+  color[num_objects][2] = 0.0 ;
+  reflectivity[num_objects] = 0;
+
+  Tn = 0 ;
+  Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.25   ; Tn++ ;
+  Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.25   ; Tn++ ;
+  Ttypelist[Tn] = SZ ; Tvlist[Tn] =  0.25   ; Tn++ ;
+  Ttypelist[Tn] = TX ; Tvlist[Tn] =  -0.5   ; Tn++ ;
+  Ttypelist[Tn] = TZ ; Tvlist[Tn] =  2      ; Tn++ ;
+
+  M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+  M3d_mat_mult(obmat[num_objects], vm, m) ;
+  M3d_mat_mult(obinv[num_objects], mi, vi) ;
+
+  grad[num_objects] = sphere_grad;
+  intersection[num_objects] = sphere_intersection;
+  num_objects++ ; // don't forget to do this
+  //////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////
+
+  // =======================================================================
 
     
+  // ====================== Set up eye & space =============================
+    double eye[3], coi[3], up[3];
+    double light_in_world_space[3];
+    double t;
 
-    light_in_eye_space[0] = 0;
-    light_in_eye_space[1] = 0;
-    light_in_eye_space[2] = 1;
-    Rsource[0] =  0 ;  Rsource[1] =  0 ;  Rsource[2] = 0 ;    
+    coi[0] = 0;
+    coi[1] = 0;
+    coi[2] = 3;
 
-    G_rgb(0,0,0) ;
-    G_clear() ;
+    up[0] = 0;
+    up[1] = 1;
+    up[2] = 0;
 
-    // go through a first random pass to draw some points
-    for(int i=0; i<800; ++i) {
-      for(int j=0; j<800; ++j) {
-        double screen_pos[2];
-        screen_pos[0] = i * 1.0;
-        screen_pos[1] = j * 1.0;
-        screen_to_coords(Rtip, screen_pos);
+    light_in_world_space[0] = 0;
+    light_in_world_space[1] = 0;
+    light_in_world_space[2] = 0;
+  // =======================================================================
 
-        argb[0] = 0;
-        argb[1] = 0;
-        argb[2] = 0;
-        ray (Rsource, Rtip, argb) ; 
-        G_rgb(argb[0], argb[1], argb[2]);
-        G_point(screen_pos[0], screen_pos[1]);
-      }
-    }
-
-    while(1)
+    t = 0;
+    do
     {
+      G_rgb(0,0,0) ;
+      G_clear() ;
 
+      // rotate view around
+      eye[0] = 0; //*cos(t);
+      eye[1] = 0; //4*sin(t/100);
+      eye[2] = -1; //4*sin(t);
+      t += 0.01;
 
+      Draw_all(light_in_world_space, eye, coi, up);
 
-      double p[2];
-      G_wait_click(p);
-      if(p[1] < 50) { break; }
-
-      screen_to_coords(Rtip, p);
-
-
-
-      // redraw screen
-      //G_rgb(0,0,0) ;
-      //G_clear() ;
-  
-      G_rgb(1,1,1) ; G_draw_string("click here to quit", 50,50) ;
-
-
-      // draw point
-      argb[0] = 0;
-      argb[1] = 0;
-      argb[2] = 0;
-      ray (Rsource, Rtip, argb) ; 
-      G_rgb(argb[0], argb[1], argb[2]);
-      G_point(p[0], p[1]);
-
-    }
+    } while(G_wait_key() != 'q');
 
     G_save_image_to_file("2d_Simple_Raytracer.xwd") ;
 }
-
-
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -507,6 +522,6 @@ int test01()
 
 int main()
 {
-  G_init_graphics(800,800);
+  G_init_graphics(SCREEN_WIDTH,SCREEN_HEIGHT);
   test01() ;
 }
