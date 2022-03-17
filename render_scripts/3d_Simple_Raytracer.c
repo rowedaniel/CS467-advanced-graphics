@@ -2,15 +2,135 @@
 #include "M3d_matrix_tools.c"
 
 #define M_YON 10000
+#define M 100
 
-double obmat[100][4][4] ;
-double obinv[100][4][4] ;
-double color[100][3] ;
-int (*grad[100])(double gradient[3], int onum, double intersection[3]);
-void (*draw[100])(int onum);
-double (*intersection[100])(double start[3], double change[3]);
+double obmat[M][4][4] ;
+double obinv[M][4][4] ;
+double color[M][3] ;
+double reflectivity[M] ;
+int (*grad[M])(double gradient[3], int onum, double intersection[3]);
+void (*draw[M])(int onum);
+double (*intersection[M])(double start[3], double change[3]);
 int    num_objects ;
 
+
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+// To support the light model :
+double light_in_eye_space[3] ;
+double AMBIENT      = 0.2 ;
+double MAX_DIFFUSE  = 0.5 ;
+double SPECPOW      = 50 ;
+
+
+
+int Light_Model (double irgb[3],
+                 double s[3],
+                 double p[3],
+                 double n[3],
+                 double argb[3])
+// s,p,n in eyespace
+
+// irgb == inherent color of object (input to this function)
+// s = location of start of ray (probably the eye)
+// p = point on object (input to this function)
+// n = normal to the object at p (input to this function)
+// argb == actual color of object (output of this function)
+// globals : AMBIENT, MAX_DIFFUSE, SPECPOW, light_in_eye_space[3]
+
+// return 1 if successful, 0 if error
+{
+
+  double len ;
+  double N[3] ; 
+  len = sqrt(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]) ;
+  if (len == 0) return 0 ;
+  N[0] = n[0]/len ;  N[1] = n[1]/len ;  N[2] = n[2]/len ;
+
+  double E[3] ;
+  E[0] = s[0] - p[0] ; 
+  E[1] = s[1] - p[1] ; 
+  E[2] = s[2] - p[2] ; 
+  len = sqrt(E[0]*E[0] + E[1]*E[1] + E[2]*E[2]) ;
+  if (len == 0) return 0 ;
+  E[0] /= len ;  E[1] /= len ;  E[2] /= len ;
+  double NdotE = N[0]*E[0] + N[1]*E[1] + N[2]*E[2] ;
+
+  double L[3] ;
+  L[0] = light_in_eye_space[0] - p[0] ; 
+  L[1] = light_in_eye_space[1] - p[1] ; 
+  L[2] = light_in_eye_space[2] - p[2] ; 
+  len = sqrt(L[0]*L[0] + L[1]*L[1] + L[2]*L[2]) ;
+  if (len == 0) return 0 ;
+  L[0] /= len ;  L[1] /= len ;  L[2] /= len ;
+  double NdotL = N[0]*L[0] + N[1]*L[1] + N[2]*L[2] ;
+
+
+
+
+
+  double max_ambient_and_diffuse = AMBIENT + MAX_DIFFUSE ;
+     // this needs to occur BEFORE you possibly jump to LLL below
+
+
+
+
+  double intensity ;
+  if (NdotL*NdotE < 0) {
+    // eye and light are on opposite sides of polygon
+    intensity = AMBIENT ; 
+    goto LLL ;
+  } else if ((NdotL < 0) && (NdotE < 0)) {
+    // eye and light on same side but normal pointing "wrong" way
+    N[0] *= (-1.0) ;    N[1] *= (-1.0) ;    N[2] *= (-1.0) ; 
+    NdotE *= (-1.0) ;   // don't use NdotE below, probably should eliminate this
+  }
+
+
+  // ignore Blinn's variant
+  double R[3] ; // Reflection vector of incoming light
+  R[0] = 2*NdotL*N[0] - L[0] ;
+  R[1] = 2*NdotL*N[1] - L[1] ;
+  R[2] = 2*NdotL*N[2] - L[2] ;
+
+  double EdotR = E[0]*R[0] + E[1]*R[1] + E[2]*R[2] ;
+
+  double diffuse ;
+  if (NdotL <= 0.0) { diffuse = 0.0 ; }
+  else { diffuse = MAX_DIFFUSE*NdotL ; }
+
+  double specular ;
+  if (EdotR <= 0.0) { specular = 0.0 ; }
+  else { specular = (1.0 - max_ambient_and_diffuse)*pow(EdotR,SPECPOW) ;}
+
+  // printf("%lf %lf\n",diffuse,specular) ;
+  intensity = AMBIENT + diffuse + specular ;
+
+
+
+ LLL : ;
+
+  double f,g ;
+  if (intensity <= max_ambient_and_diffuse) {
+    f = intensity / max_ambient_and_diffuse ;
+    argb[0] = f * irgb[0] ;
+    argb[1] = f * irgb[1] ;
+    argb[2] = f * irgb[2] ;
+  } else {
+    f = (intensity - max_ambient_and_diffuse) / 
+                           (1.0 - max_ambient_and_diffuse) ;
+    g = 1.0 - f ;
+    argb[0] = g * irgb[0] + f ;
+    argb[1] = g * irgb[1] + f ;
+    argb[2] = g * irgb[2] + f ;
+  }
+
+  return 1 ;
+}
 
 
 /////////////////////////////////////////////////////////////////////////
@@ -80,6 +200,9 @@ double plane_intersection(double start[3], double change[3]) {
     return M_YON + 1;
   }
   double t = -start[2] / change[2];
+  if(t < 0) {
+    return M_YON + 1;
+  }
 
   double x = start[0] + t * change[0];
   double y = start[1] + t * change[1];
@@ -149,39 +272,41 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
   }
 
   if(t_closest > M_YON) {
+    for(int j=0; j<3; ++j) {
+      // didn't hit anything, so make color 0
+      argb[j] = 0;
+    }
 	  return 0;
   }
 
 
-  // set color to this object's color:
-  // TODO: implement lightmodel here
-  // TODO: implement reflection here
-  if(n == 0) {
-    for(int j=0; j<3; ++j) {
-      argb[j] = color[saved_onum][j];
-    }
-  }
+  // get the point of intersection
+  // first, calculate change
+  double change[3];
+  M3d_vector_mult_const(change, Rsource, -1);
+  M3d_vector_add(change, change, Rtip);
 
+  // then get point = Rsource + t(change)
+  double point[3] = {0,0,0};
+  // reduce t_closest slightly to avoid z-fighting
+  t_closest *= 0.999;
+  M3d_vector_mult_const(point, change, t_closest);
+  M3d_vector_add(point, Rsource, point);
+
+  // calculate normal
+  double normal[3];
+  get_normal(normal, saved_onum, point);
+
+  // set color to this object's color:
+  double o_color[3];
+  Light_Model(color[saved_onum],
+              Rtip, point, normal,
+              o_color);
 
 
   // recurse!
   if (n > 0) {
-    // get a point on the opposite side of Rtip as Rsource
-    // first, get the change = Rtip - Rsource
-    double change[3];
-    M3d_vector_mult_const(change, Rsource, -1);
-    M3d_vector_add(change, change, Rtip);
 
-    // then get point = Rsource + t(change)
-    double point[3] = {0,0,0};
-    // reduce t_closest slightly to avoid z-fighting
-    t_closest *= 0.999;
-    M3d_vector_mult_const(point, change, t_closest);
-    M3d_vector_add(point, Rsource, point);
-
-    // calculate normal
-    double normal[3];
-    get_normal(normal, saved_onum, point);
 
     // calculate reflection angle
     // get transformation matrix to reflect across plane defined by normal vector
@@ -192,22 +317,26 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
     M3d_normalize(look, look);
 
     // reflection = look - 2(look * normal)normal
+    // get the point of intersection
+    // first, calculate change
     M3d_vector_mult_const(reflection, normal, -2*M3d_dot_product(look, normal));
     M3d_vector_add(reflection, reflection, look);
 
-    if(saved_onum == 0) {
-      printf("old change vector:\n");
-      M3d_print_vector(change);
-      printf("new look vector:\n");
-      M3d_print_vector(look);
-    }
 
     // new tip = reflection + intersection
     double new_tip[3];
     M3d_vector_add(new_tip, reflection, point);
 
-
     ray_recursive(point, new_tip, argb, n-1);
+
+    // mix the colors
+    // (for now, just have hardcoded 70% reflection)
+    // TODO: add better support for reflection
+  }
+
+  for(int j=0; j<3; ++j) {
+    const double r = reflectivity[saved_onum];
+    argb[j] = (1-r) * o_color[j] + r * argb[j];
   }
 
 
@@ -219,7 +348,7 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 
 int ray(double Rsource[3], double Rtip[3], double argb[3])
 {
-  ray_recursive(Rsource, Rtip, argb, 1);
+  ray_recursive(Rsource, Rtip, argb, 10);
 }
 
 
@@ -249,60 +378,68 @@ int test01()
     //////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 1.0 ;
-    color[num_objects][1] = 0.3 ; 
+    color[num_objects][1] = 1.0 ; 
+    color[num_objects][2] = 1.0 ;
+    reflectivity[num_objects] = 0.9;
+	
+    Tn = 0 ;
+    Ttypelist[Tn] = RY ; Tvlist[Tn] =  60  ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  1   ; Tn++ ;
+    Ttypelist[Tn] = TZ ; Tvlist[Tn] =  2   ; Tn++ ;
+	
+    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+    M3d_mat_mult(obmat[num_objects], vm, m) ;
+    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+
+    grad[num_objects] = plane_grad;
+    intersection[num_objects] = plane_intersection;
+    num_objects++ ; // don't forget to do this
+    //////////////////////////////////////////////////////////////
+    color[num_objects][0] = 1.0 ;
+    color[num_objects][1] = 1.0 ; 
+    color[num_objects][2] = 1.0 ;
+    reflectivity[num_objects] = 0.9;
+	
+    Tn = 0 ;
+    Ttypelist[Tn] = RY ; Tvlist[Tn] =  -60 ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  -2  ; Tn++ ;
+    Ttypelist[Tn] = TZ ; Tvlist[Tn] =  3   ; Tn++ ;
+	
+    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+    M3d_mat_mult(obmat[num_objects], vm, m) ;
+    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+
+    grad[num_objects] = plane_grad;
+    intersection[num_objects] = plane_intersection;
+    num_objects++ ; // don't forget to do this
+    //////////////////////////////////////////////////////////////
+    color[num_objects][0] = 1.0 ;
+    color[num_objects][1] = 0.0 ; 
     color[num_objects][2] = 0.0 ;
+    reflectivity[num_objects] = 0;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = RY ; Tvlist[Tn] =  45  ; Tn++ ;
-    Ttypelist[Tn] = TZ ; Tvlist[Tn] =  4   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.25   ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.25   ; Tn++ ;
+    Ttypelist[Tn] = SZ ; Tvlist[Tn] =  0.25   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  -0.5   ; Tn++ ;
+    Ttypelist[Tn] = TZ ; Tvlist[Tn] =  2      ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;
     M3d_mat_mult(obinv[num_objects], mi, vi) ;
 
-    grad[num_objects] = plane_grad;
-    intersection[num_objects] = plane_intersection;
-    num_objects++ ; // don't forget to do this
-    //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 0.2 ;
-    color[num_objects][1] = 0.6 ; 
-    color[num_objects][2] = 0.3 ;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = RY ; Tvlist[Tn] =  90  ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  -2   ; Tn++ ;
-    Ttypelist[Tn] = TZ ; Tvlist[Tn] =  4   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
-
-    grad[num_objects] = plane_grad;
-    intersection[num_objects] = plane_intersection;
-    num_objects++ ; // don't forget to do this
-    //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 0.3 ;
-    color[num_objects][1] = 0.2 ; 
-    color[num_objects][2] = 0.6 ;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.1  ; Tn++ ;
-    Ttypelist[Tn] = RY ; Tvlist[Tn] =  90  ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  3   ; Tn++ ;
-    Ttypelist[Tn] = TZ ; Tvlist[Tn] =  4   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
-
-    grad[num_objects] = plane_grad;
-    intersection[num_objects] = plane_intersection;
+    grad[num_objects] = sphere_grad;
+    intersection[num_objects] = sphere_intersection;
     num_objects++ ; // don't forget to do this
     //////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////
 
     
 
+    light_in_eye_space[0] = 0;
+    light_in_eye_space[1] = 0;
+    light_in_eye_space[2] = 1;
     Rsource[0] =  0 ;  Rsource[1] =  0 ;  Rsource[2] = 0 ;    
 
     G_rgb(0,0,0) ;
@@ -316,9 +453,9 @@ int test01()
         screen_pos[1] = j * 1.0;
         screen_to_coords(Rtip, screen_pos);
 
-        argb[0] = 1;
-        argb[1] = 1;
-        argb[2] = 1;
+        argb[0] = 0;
+        argb[1] = 0;
+        argb[2] = 0;
         ray (Rsource, Rtip, argb) ; 
         G_rgb(argb[0], argb[1], argb[2]);
         G_point(screen_pos[0], screen_pos[1]);
@@ -346,9 +483,9 @@ int test01()
 
 
       // draw point
-      argb[0] = 1;
-      argb[1] = 1;
-      argb[2] = 1;
+      argb[0] = 0;
+      argb[1] = 0;
+      argb[2] = 0;
       ray (Rsource, Rtip, argb) ; 
       G_rgb(argb[0], argb[1], argb[2]);
       G_point(p[0], p[1]);
