@@ -543,9 +543,13 @@ int test01()
       G_wait_click(p);
       if(p[1] < 50) { break; }
 
+      /*
       Rtip[0] = 100;
       Rtip[1] = (p[1]-Rsource[1]) / (p[0] - Rsource[0]) * (Rtip[0] - Rsource[0]) + Rsource[1];
       Rtip[2] = 0;
+      */
+      Rtip[0] = p[0];
+      Rtip[1] = p[1];
 
 
 
