@@ -143,7 +143,7 @@ void Draw_line_segment (int onum)
 
 // ============================ hyperboloid stuff ==========================================
 int hyperbola_grad(double gradient[3], int onum, double intersection[3]) {
-  // for hyperbola, grad is <2x, -2y>
+  // for hyperbola, grad is <2x, -2y, 2z>
   M3d_mat_mult_pt(gradient, obinv[onum], intersection);
   M3d_vector_mult_const(gradient, gradient, 2);
   gradient[1] *= -1;
@@ -168,6 +168,7 @@ double hyperbola_intersection(double start[3], double change[3])
     if(t[i] < 0) {
       continue;
     }
+
     // make sure it's in the hyperbola bounds -1 <= y <= 1
     double y = start[1] + change[1] * t[i];
     if(-1 > y || y > 1) {
@@ -292,7 +293,7 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
   // add to get tip
   double point[3] = {0,0,0};
   // reduce t_closest slightly to avoid z-fighting
-  t_closest *= 0.999;
+  //t_closest *= 0.999;
   M3d_vector_mult_const(point, change, t_closest);
   M3d_vector_add(point, Rsource, point);
 
@@ -319,11 +320,14 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
     M3d_vector_mult_const(look, Rsource, -1);
     M3d_vector_add(look, look, point);
     M3d_normalize(look, look);
-    M3d_vector_mult_const(look, look, 0.01);
 
     // reflection = look - 2(look * normal)normal
     M3d_vector_mult_const(reflection, normal, -2*M3d_dot_product(look, normal));
     M3d_vector_add(reflection, reflection, look);
+
+    // move point out slightly, to avoid colliding with the same object again
+    M3d_vector_mult_const(reflection, reflection, 1);
+    M3d_vector_add(point, point, reflection);
 
     // new tip = reflection + intersection
     double new_tip[3];
@@ -331,7 +335,7 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 
 
     G_rgb(1,1,1);
-    G_line(point[0], point[1], new_tip[0], new_tip[1]);
+    G_line(point[0], point[1], point[0] + reflection[0]*30, point[1] + reflection[1]*30);
 
     ray_recursive(point, new_tip, argb, n-1);
   }
@@ -497,7 +501,7 @@ int test01()
     Ttypelist[Tn] = SY ; Tvlist[Tn] =  80   ; Tn++ ;
     Ttypelist[Tn] = RZ ; Tvlist[Tn] =  -7   ; Tn++ ;
     Ttypelist[Tn] = TX ; Tvlist[Tn] =  200   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  630   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  530   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;

@@ -244,13 +244,6 @@ double hyperboloid_intersection(double start[3], double change[3])
     if(t[i] < 0) {
       continue;
     }
-
-    // make sure it's in the hyperbola bounds -1 <= y <= 1
-    double y = start[1] + change[1] * t[i];
-    if(-1 > y || y > 1) {
-      continue;
-    }
-
     if(t[i] < t_closest) {
       t_closest = t[i];
     }
@@ -282,7 +275,7 @@ int get_normal(double normal[3], int onum, double intersection[3]) {
   M3d_normalize(normal, normal);
 }
 
-int cast_ray(double Rsource[3], double Rtip[3], int n, double point[3])
+int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 {
 
   double t_closest = M_YON + 1;
@@ -313,13 +306,17 @@ int cast_ray(double Rsource[3], double Rtip[3], int n, double point[3])
       t_closest = t;
       saved_onum = onum;
     }
+
+
   }
 
-  if(t_closest == M_YON + 1) {
-    // no intersection, so give an onum of -1
-    return -1;
+  if(t_closest > M_YON) {
+    for(int j=0; j<3; ++j) {
+      // didn't hit anything, so make color 0
+      argb[j] = 0;
+    }
+	  return 0;
   }
-
 
 
   // get the point of intersection
@@ -329,25 +326,11 @@ int cast_ray(double Rsource[3], double Rtip[3], int n, double point[3])
   M3d_vector_add(change, change, Rtip);
 
   // then get point = Rsource + t(change)
+  double point[3] = {0,0,0};
+  // reduce t_closest slightly to avoid z-fighting
+  t_closest *= 0.999;
   M3d_vector_mult_const(point, change, t_closest);
   M3d_vector_add(point, Rsource, point);
-  return saved_onum;
-}
-
-int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
-{
-  // default color to black
-  for(int j=0; j<3; ++j) {
-    argb[j] = 0;
-  }
-
-  // get point of intersection
-  double point[3];
-  int saved_onum = cast_ray(Rsource, Rtip, n, point);
-  if(saved_onum == -1) {
-    // no intersection
-    return 0;
-  }
 
   // calculate normal
   double normal[3];
@@ -356,9 +339,7 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
   // set color to this object's color:
   double o_color[3];
   Light_Model(color[saved_onum],
-              Rtip,
-              point,
-              normal,
+              Rtip, point, normal,
               o_color);
 
 
@@ -375,12 +356,11 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
     M3d_normalize(look, look);
 
     // reflection = look - 2(look * normal)normal
+    // get the point of intersection
+    // first, calculate change
     M3d_vector_mult_const(reflection, normal, -2*M3d_dot_product(look, normal));
     M3d_vector_add(reflection, reflection, look);
 
-    // move point out slightly, to avoid colliding with the same object again
-    M3d_vector_mult_const(reflection, reflection, 0.01);
-    M3d_vector_add(point, point, reflection);
 
     // new tip = reflection + intersection
     double new_tip[3];
@@ -388,6 +368,9 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 
     ray_recursive(point, new_tip, argb, n-1);
 
+    // mix the colors
+    // (for now, just have hardcoded 70% reflection)
+    // TODO: add better support for reflection
   }
 
   for(int j=0; j<3; ++j) {
@@ -409,7 +392,7 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 
 int ray(double Rsource[3], double Rtip[3], double argb[3])
 {
-  ray_recursive(Rsource, Rtip, argb, 1);
+  ray_recursive(Rsource, Rtip, argb, 4);
 }
 
 
@@ -437,6 +420,12 @@ int Draw_all(double light[3], double eye[3], double coi[3], double up[3])
   }
   // also get light in eye space
   M3d_mat_mult_pt(light_in_eye_space, view_mat, light);
+
+  // testing
+  double testPoint[3] = {0,0,0};
+  M3d_mat_mult_pt(testPoint, obmat[0], testPoint);
+  printf("test point:\n");
+  M3d_print_vector(testPoint);
 
 
   const double step = 1;
@@ -487,7 +476,6 @@ int test01()
 
   //////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////
-  /*
   color[num_objects][0] = 1.0 ;
   color[num_objects][1] = 1.0 ; 
   color[num_objects][2] = 1.0 ;
@@ -503,18 +491,17 @@ int test01()
   grad[num_objects] = plane_grad;
   intersection[num_objects] = plane_intersection;
   num_objects++ ; // don't forget to do this
-  */
   //////////////////////////////////////////////////////////////
   color[num_objects][0] = 1.0 ;
   color[num_objects][1] = 1.0 ; 
   color[num_objects][2] = 1.0 ;
-  reflectivity[num_objects] = 0.8;
+  reflectivity[num_objects] = 0.9;
 
   Tn = 0 ;
   Ttypelist[Tn] = SX ; Tvlist[Tn] =  2   ; Tn++ ;
   Ttypelist[Tn] = SY ; Tvlist[Tn] =  2   ; Tn++ ;
   Ttypelist[Tn] = TZ ; Tvlist[Tn] =  -2  ; Tn++ ;
-  Ttypelist[Tn] = RY ; Tvlist[Tn] =  120  ; Tn++ ;
+  Ttypelist[Tn] = RY ; Tvlist[Tn] =  60  ; Tn++ ;
 
   M3d_make_movement_sequence_matrix(obmat[num_objects], obinv[num_objects], Tn, Ttypelist, Tvlist);
 
@@ -522,7 +509,6 @@ int test01()
   intersection[num_objects] = plane_intersection;
   num_objects++ ; // don't forget to do this
   //////////////////////////////////////////////////////////////
-  /*
   color[num_objects][0] = 1.0 ;
   color[num_objects][1] = 1.0 ; 
   color[num_objects][2] = 1.0 ;
@@ -539,7 +525,6 @@ int test01()
   grad[num_objects] = plane_grad;
   intersection[num_objects] = plane_intersection;
   num_objects++ ; // don't forget to do this
-  */
   //////////////////////////////////////////////////////////////
   color[num_objects][0] = 1.0 ;
   color[num_objects][1] = 0.0 ; 
@@ -547,12 +532,11 @@ int test01()
   reflectivity[num_objects] = 0;
 
   Tn = 0 ;
-  Ttypelist[Tn] = TY ; Tvlist[Tn] =  1   ; Tn++ ;
 
   M3d_make_movement_sequence_matrix(obmat[num_objects], obinv[num_objects], Tn, Ttypelist, Tvlist);
 
-  grad[num_objects] = sphere_grad;
-  intersection[num_objects] = sphere_intersection;
+  grad[num_objects] = hyperboloid_grad;
+  intersection[num_objects] = hyperboloid_intersection;
   num_objects++ ; // don't forget to do this
   //////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////
@@ -587,7 +571,9 @@ int test01()
       // rotate view around
       eye[0] = 5*sin(t);
       eye[1] = 0; //4*sin(t/100);
-      eye[2] = 5*cos(t);
+      eye[2] = -5*cos(t);
+      printf("eye: \n");
+      M3d_print_vector(eye);
 
       up[0] = eye[0];
       up[1] = 1;
