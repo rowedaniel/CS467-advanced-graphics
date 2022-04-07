@@ -1,20 +1,126 @@
 #include "FPToolkit.c"
 #include "M3d_matrix_tools.c"
+#include "xwd_tools_03.c"
 
+#define M_HITHER 0.01
 #define M_YON 10000
 #define M 100
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
+#define SIMPLE_COLOR 0
+#define TEXTURE_COLOR 1
 
+// color
+double color_type[M] ;
+double color[M][3] ;
+int image_IDs[M];
+int image_size[M][2];
+double reflectivity[M] ;
+
+// object info
 double obmat[M][4][4] ;
 double obinv[M][4][4] ;
-double color[M][3] ;
-double reflectivity[M] ;
 int (*grad[M])(double gradient[3], int onum, double intersection[3]);
-void (*draw[M])(int onum);
 double (*intersection[M])(double start[3], double change[3]);
+int (*to_parametric[M])(double point[3], double P[2]);
+
 int    num_objects ;
 
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+int get_color(int onum, double point[3], double rgb[3])
+{
+  if(color_type[onum] == SIMPLE_COLOR) {
+    for(int i=0; i<3; ++i) {
+      rgb[i] = color[onum][i];
+    }
+  } else if(color_type[onum] == TEXTURE_COLOR){
+    // convert to object space
+    double o_point[3];
+    M3d_mat_mult_pt(o_point, obinv[onum], point);
+
+
+
+    double P[2];
+    to_parametric[onum](o_point, P);
+    int x = floor( image_size[onum][0] * P[0] );
+    int y = floor( image_size[onum][1] * P[1] );
+    int e = get_xwd_map_color(image_IDs[onum], x,y,rgb);
+  }
+}
+
+
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+// returns object number and t value for closest object intersected by ray
+int ray_get_closest_obj(double Rsource[3], double Rtip[3], double point[3], double * ret_t)
+{
+  double t_closest = M_YON + 1;
+  int saved_onum = -1;
+
+
+  // line = start + t*change
+  for(int onum = 0; onum < num_objects; ++onum) {
+    double tip[3];
+    double start[3];
+  
+    // calculate and start
+    M3d_vector_copy(start, Rsource);
+    M3d_vector_copy(tip, Rtip);
+
+    // transform line to object space
+    M3d_mat_mult_pt(start, obinv[onum], start);
+    M3d_mat_mult_pt(tip, obinv[onum], tip);
+
+    // subtract start from change
+    double change[3];
+    M3d_vector_mult_const(change, start, -1);
+    M3d_vector_add(change, change, tip);
+
+    double t = intersection[onum](start, change);
+    if(t < t_closest) {
+      // new closest point! Save this one.
+      t_closest = t;
+      saved_onum = onum;
+    }
+  }
+
+  if(t_closest == M_YON + 1) {
+    // no intersection, so give an onum of -1
+    return -1;
+  }
+  (*ret_t) = t_closest;
+  return saved_onum;
+}
+
+int cast_ray(double Rsource[3], double Rtip[3], double point[3])
+{
+  double t;
+  int saved_onum = ray_get_closest_obj(Rsource, Rtip, point, &t);
+  if(saved_onum == -1) {
+    return -1;
+  }
+
+
+  // get the point of intersection
+  // first, calculate change
+  double change[3];
+  M3d_vector_mult_const(change, Rsource, -1);
+  M3d_vector_add(change, change, Rtip);
+
+  // then get point = Rsource + t(change)
+  M3d_vector_mult_const(point, change, t);
+  M3d_vector_add(point, Rsource, point);
+  return saved_onum;
+}
 
 
 /////////////////////////////////////////////////////////////////////////
@@ -47,6 +153,10 @@ int Light_Model (double irgb[3],
 // return 1 if successful, 0 if error
 {
 
+
+
+
+
   double len ;
   double N[3] ; 
   len = sqrt(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]) ;
@@ -72,6 +182,15 @@ int Light_Model (double irgb[3],
   double NdotL = N[0]*L[0] + N[1]*L[1] + N[2]*L[2] ;
 
 
+  // flip normals if they're pointing the wrong direction
+  if(NdotL < 0) {
+    NdotL = -NdotL;
+    NdotE = -NdotE;
+    M3d_vector_mult_const(N, N, -1);
+  }
+
+
+
 
 
 
@@ -82,6 +201,24 @@ int Light_Model (double irgb[3],
 
 
   double intensity ;
+
+  // raycast to light, stop if you hit anything
+  // first, move point out slightly from start, to prevent colliding with the same object
+  double point[3];
+  M3d_vector_mult_const(point, L, M_HITHER);
+  M3d_vector_add(point, point, p);
+  // then get the intersection
+  double blocking_t;
+  int blocking_onum = ray_get_closest_obj(point, light_in_eye_space, point, &blocking_t);
+  // finally subtract p from point to get the vector
+
+  if(blocking_onum != -1  && \
+    blocking_t < 1)
+  {
+    intensity = AMBIENT;
+    goto LLL ;
+  }
+
   if (NdotL*NdotE < 0) {
     // eye and light are on opposite sides of polygon
     intensity = AMBIENT ; 
@@ -187,6 +324,18 @@ double sphere_intersection(double start[3], double change[3])
 
   return t_closest;
 }
+int sphere_to_parametric(double point[3], double P[2])
+{
+  // parameterization = (cos(u)cos(v), sin(u)cos(v), sin(v))
+  // so v=asin(z), u=atan2(y,x)
+  // finally rescale so that 0<=u,v<=1
+  P[1] = (point[1] + 1) / 2;
+  if(P[1] == -1 || P[1] == 1) {
+    P[0] = 0;
+    return 0;
+  }
+  P[0] = (atan2(point[1]/sqrt(1-P[1]*P[1]), point[2]/sqrt(1-P[1]*P[1])) + M_PI/2) / M_PI;
+}
 
 // ==========================================================================
 
@@ -213,6 +362,13 @@ double plane_intersection(double start[3], double change[3]) {
     return M_YON + 1;
   }
   return t;
+}
+int plane_to_parametric(double point[3], double P[2])
+{
+  // plane parameterization is (u, v, 0)
+  // rescale so that 0<=u,v<=1
+  P[0] = (point[0] + 1) / 2;
+  P[1] = (point[1] + 1) / 2;
 }
 // ==========================================================================
 
@@ -258,6 +414,14 @@ double hyperboloid_intersection(double start[3], double change[3])
 
   return t_closest;
 }
+int hyperboloid_to_parametric(double point[3], double P[2])
+{
+  // hyperboloid parameterization is (cos(u)sec(v), sin(u)sec(v), tan(v))
+  // inverse is u=atan2(z,x), v=atan(y)
+  // rescale so that 0<=u,v<=1
+  P[0] = atan2(point[2], point[0]) / M_PI / 2;
+  P[1] = atan(point[1]) / M_PI / 2;
+}
 // ==========================================================================
 
 
@@ -282,57 +446,6 @@ int get_normal(double normal[3], int onum, double intersection[3]) {
   M3d_normalize(normal, normal);
 }
 
-int cast_ray(double Rsource[3], double Rtip[3], int n, double point[3])
-{
-
-  double t_closest = M_YON + 1;
-  int saved_onum = -1;
-
-
-  // line = start + t*change
-  for(int onum = 0; onum < num_objects; ++onum) {
-    double tip[3];
-    double start[3];
-  
-    // calculate and start
-    M3d_vector_copy(start, Rsource);
-    M3d_vector_copy(tip, Rtip);
-
-    // transform line to object space
-    M3d_mat_mult_pt(start, obinv[onum], start);
-    M3d_mat_mult_pt(tip, obinv[onum], tip);
-
-    // subtract start from change
-    double change[3];
-    M3d_vector_mult_const(change, start, -1);
-    M3d_vector_add(change, change, tip);
-
-    double t = intersection[onum](start, change);
-    if(t < t_closest) {
-      // new closest point! Save this one.
-      t_closest = t;
-      saved_onum = onum;
-    }
-  }
-
-  if(t_closest == M_YON + 1) {
-    // no intersection, so give an onum of -1
-    return -1;
-  }
-
-
-
-  // get the point of intersection
-  // first, calculate change
-  double change[3];
-  M3d_vector_mult_const(change, Rsource, -1);
-  M3d_vector_add(change, change, Rtip);
-
-  // then get point = Rsource + t(change)
-  M3d_vector_mult_const(point, change, t_closest);
-  M3d_vector_add(point, Rsource, point);
-  return saved_onum;
-}
 
 int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 {
@@ -343,11 +456,12 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 
   // get point of intersection
   double point[3];
-  int saved_onum = cast_ray(Rsource, Rtip, n, point);
+  int saved_onum = cast_ray(Rsource, Rtip, point);
   if(saved_onum == -1) {
     // no intersection
     return 0;
   }
+
 
   // calculate normal
   double normal[3];
@@ -355,15 +469,18 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 
   // set color to this object's color:
   double o_color[3];
-  Light_Model(color[saved_onum],
+  get_color(saved_onum, point, o_color);
+  Light_Model(o_color,
               Rtip,
               point,
               normal,
               o_color);
 
+  double new_color[3];
+
 
   // recurse!
-  if (n > 0) {
+  if (n > 0 && reflectivity[saved_onum] > 0) {
 
 
     // calculate reflection angle
@@ -379,20 +496,20 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
     M3d_vector_add(reflection, reflection, look);
 
     // move point out slightly, to avoid colliding with the same object again
-    M3d_vector_mult_const(reflection, reflection, 0.01);
+    M3d_vector_mult_const(reflection, reflection, M_HITHER);
     M3d_vector_add(point, point, reflection);
 
     // new tip = reflection + intersection
     double new_tip[3];
     M3d_vector_add(new_tip, reflection, point);
 
-    ray_recursive(point, new_tip, argb, n-1);
+    ray_recursive(point, new_tip, new_color, n-1);
 
   }
 
   for(int j=0; j<3; ++j) {
     const double r = reflectivity[saved_onum];
-    argb[j] = (1-r) * o_color[j] + r * argb[j];
+    argb[j] = (1-r) * o_color[j] + r * new_color[j];
   }
 
 }
@@ -482,78 +599,80 @@ int test01()
   // ======================== Build Objects ==========================
   double Tvlist[100];
   int Tn, Ttypelist[100];
+  int error;
 
   num_objects = 0 ;
 
   //////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////
-  /*
-  color[num_objects][0] = 1.0 ;
-  color[num_objects][1] = 1.0 ; 
-  color[num_objects][2] = 1.0 ;
-  reflectivity[num_objects] = 0.9;
+  color_type[num_objects] = TEXTURE_COLOR;
+  image_IDs[num_objects] = init_xwd_map_from_file("clock.xwd");
+  if(image_IDs[num_objects] == -1) { printf("File load failure!\n"); exit(0); }
+  error = get_xwd_map_dimensions(image_IDs[num_objects],image_size[num_objects]); 
+  if(error == -1) { printf("File load failure!\n"); exit(0); }
+
+  reflectivity[num_objects] = 0.0;
 
   Tn = 0 ;
-  Ttypelist[Tn] = SX ; Tvlist[Tn] =  2   ; Tn++ ;
-  Ttypelist[Tn] = SY ; Tvlist[Tn] =  2   ; Tn++ ;
-  Ttypelist[Tn] = TZ ; Tvlist[Tn] =  2   ; Tn++ ;
+  Ttypelist[Tn] = RX ; Tvlist[Tn] =  90   ; Tn++ ;
+  Ttypelist[Tn] = SX ; Tvlist[Tn] =  6   ; Tn++ ;
+  Ttypelist[Tn] = SY ; Tvlist[Tn] =  6   ; Tn++ ;
+  Ttypelist[Tn] = SZ ; Tvlist[Tn] =  6   ; Tn++ ;
+  Ttypelist[Tn] = TY ; Tvlist[Tn] =  -4   ; Tn++ ;
 
   M3d_make_movement_sequence_matrix(obmat[num_objects], obinv[num_objects], Tn, Ttypelist, Tvlist);
 
   grad[num_objects] = plane_grad;
   intersection[num_objects] = plane_intersection;
+  to_parametric[num_objects] = plane_to_parametric;
   num_objects++ ; // don't forget to do this
-  */
   //////////////////////////////////////////////////////////////
-  color[num_objects][0] = 1.0 ;
-  color[num_objects][1] = 1.0 ; 
-  color[num_objects][2] = 1.0 ;
-  reflectivity[num_objects] = 0.8;
+  color_type[num_objects] = TEXTURE_COLOR;
+  image_IDs[num_objects] = init_xwd_map_from_file("clock.xwd");
+  if(image_IDs[num_objects] == -1) { printf("File load failure!\n"); exit(0); }
+  error = get_xwd_map_dimensions(image_IDs[num_objects],image_size[num_objects]); 
+  if(error == -1) { printf("File load failure!\n"); exit(0); }
+
+  reflectivity[num_objects] = 0.1;
 
   Tn = 0 ;
   Ttypelist[Tn] = SX ; Tvlist[Tn] =  2   ; Tn++ ;
   Ttypelist[Tn] = SY ; Tvlist[Tn] =  2   ; Tn++ ;
-  Ttypelist[Tn] = TZ ; Tvlist[Tn] =  -2  ; Tn++ ;
-  Ttypelist[Tn] = RY ; Tvlist[Tn] =  120  ; Tn++ ;
-
-  M3d_make_movement_sequence_matrix(obmat[num_objects], obinv[num_objects], Tn, Ttypelist, Tvlist);
-
-  grad[num_objects] = plane_grad;
-  intersection[num_objects] = plane_intersection;
-  num_objects++ ; // don't forget to do this
-  //////////////////////////////////////////////////////////////
-  /*
-  color[num_objects][0] = 1.0 ;
-  color[num_objects][1] = 1.0 ; 
-  color[num_objects][2] = 1.0 ;
-  reflectivity[num_objects] = 0.9;
-
-  Tn = 0 ;
-  Ttypelist[Tn] = SX ; Tvlist[Tn] =  2   ; Tn++ ;
-  Ttypelist[Tn] = SY ; Tvlist[Tn] =  2   ; Tn++ ;
-  Ttypelist[Tn] = TZ ; Tvlist[Tn] =  -2  ; Tn++ ;
-  Ttypelist[Tn] = RY ; Tvlist[Tn] = 120  ; Tn++ ;
-
-  M3d_make_movement_sequence_matrix(obmat[num_objects], obinv[num_objects], Tn, Ttypelist, Tvlist);
-
-  grad[num_objects] = plane_grad;
-  intersection[num_objects] = plane_intersection;
-  num_objects++ ; // don't forget to do this
-  */
-  //////////////////////////////////////////////////////////////
-  color[num_objects][0] = 1.0 ;
-  color[num_objects][1] = 0.0 ; 
-  color[num_objects][2] = 0.0 ;
-  reflectivity[num_objects] = 0;
-
-  Tn = 0 ;
-  Ttypelist[Tn] = TY ; Tvlist[Tn] =  1   ; Tn++ ;
+  Ttypelist[Tn] = SZ ; Tvlist[Tn] =  2   ; Tn++ ;
 
   M3d_make_movement_sequence_matrix(obmat[num_objects], obinv[num_objects], Tn, Ttypelist, Tvlist);
 
   grad[num_objects] = sphere_grad;
   intersection[num_objects] = sphere_intersection;
+  to_parametric[num_objects] = sphere_to_parametric;
   num_objects++ ; // don't forget to do this
+  //////////////////////////////////////////////////////////////
+  for(int i=0; i<5; ++i) {
+    color_type[num_objects] = TEXTURE_COLOR;
+    to_parametric[num_objects] = plane_to_parametric;
+    image_IDs[num_objects] = init_xwd_map_from_file("earth_jeff.xwd");
+    if(image_IDs[num_objects] == -1) { printf("File load failure!\n"); exit(0); }
+    error = get_xwd_map_dimensions(image_IDs[num_objects],image_size[num_objects]); 
+    if(error == -1) { printf("File load failure!\n"); exit(0); }
+
+    reflectivity[num_objects] = 0;
+
+    Tn = 0 ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.5   ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.5   ; Tn++ ;
+    Ttypelist[Tn] = SZ ; Tvlist[Tn] =  0.5   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  4     ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  -2    ; Tn++ ;
+    Ttypelist[Tn] = RY ; Tvlist[Tn] =  i/5.0 * 360   ; Tn++ ;
+
+    M3d_make_movement_sequence_matrix(obmat[num_objects], obinv[num_objects], Tn, Ttypelist, Tvlist);
+
+    grad[num_objects] = hyperboloid_grad;
+    intersection[num_objects] = hyperboloid_intersection;
+  to_parametric[num_objects] = hyperboloid_to_parametric;
+    num_objects++ ; // don't forget to do this
+
+  }
   //////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////
 
@@ -570,29 +689,29 @@ int test01()
     coi[2] = 0;
 
     up[0] = 0;
-    up[1] = 1;
+    up[1] = 0;
     up[2] = 0;
 
     light_in_world_space[0] = 0;
     light_in_world_space[1] = 10;
-    light_in_world_space[2] = 10;
+    light_in_world_space[2] = 0;
   // =======================================================================
 
-    t = 0;
+    t = 1;
     do
     {
       G_rgb(0,0,0) ;
       G_clear() ;
 
       // rotate view around
-      eye[0] = 5*sin(t);
+      eye[0] = 10*sin(t);
       eye[1] = 0; //4*sin(t/100);
-      eye[2] = 5*cos(t);
+      eye[2] = 10*cos(t);
 
       up[0] = eye[0];
-      up[1] = 1;
+      up[1] = eye[1]+1;
       up[2] = eye[2];
-      t += 0.1;
+      t -= 0.1;
 
       Draw_all(light_in_world_space, eye, coi, up);
 
