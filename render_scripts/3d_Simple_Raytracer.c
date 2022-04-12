@@ -330,11 +330,11 @@ int sphere_to_parametric(double point[3], double P[2])
   // so v=asin(z), u=atan2(y,x)
   // finally rescale so that 0<=u,v<=1
   P[1] = (point[1] + 1) / 2;
-  if(P[1] == -1 || P[1] == 1) {
+  if(point[1] <= -1 || point[1] >= 1) {
     P[0] = 0;
     return 0;
   }
-  P[0] = (atan2(point[1]/sqrt(1-P[1]*P[1]), point[2]/sqrt(1-P[1]*P[1])) + M_PI/2) / M_PI;
+  P[0] = (atan2(point[0]/sqrt(1-P[1]*P[1]), point[2]/sqrt(1-P[1]*P[1])) + M_PI) / M_PI / 2;
 }
 
 // ==========================================================================
@@ -373,9 +373,43 @@ int plane_to_parametric(double point[3], double P[2])
 // ==========================================================================
 
 
+
+// ================ triangle stuff ===============
+int triangle_grad(double gradient[3], int onum, double intersection[3]) {
+  gradient[0] = 0;
+  gradient[1] = 0;
+  gradient[2] = 1;
+}
+double triangle_intersection(double start[3], double change[3]) {
+  // triangle goes from points (0,0,0), (1,0,0), and (0,1,0)
+  if(change[2] == 0) {
+    return M_YON + 1;
+  }
+  double t = -start[2] / change[2];
+  if(t < 0) {
+    return M_YON + 1;
+  }
+
+  double x = start[0] + t * change[0];
+  double y = start[1] + t * change[1];
+  if(0 > x || x > 1 ||
+     0 > y || y > x) {
+    return M_YON + 1;
+  }
+  return t;
+}
+int triangle_to_parametric(double point[3], double P[2])
+{
+  // triangle parameterization is (u, v, 0)
+  // rescale so that 0<=u,v<=1
+  P[0] = point[0];
+  P[1] = point[1];
+}
+// ==========================================================================
+
 // ================ hyperboloid stuff ===============
 int hyperboloid_grad(double gradient[3], int onum, double intersection[3]) {
-  // for spheres, gradient is <2x, -2y, 2z>
+  // for hyperboloids, gradient is <2x, -2y, 2z>
   M3d_mat_mult_pt(gradient, obinv[onum], intersection);
   M3d_vector_mult_const(gradient, gradient, 2);
   gradient[1] *= -1;
@@ -383,7 +417,6 @@ int hyperboloid_grad(double gradient[3], int onum, double intersection[3]) {
 
 double hyperboloid_intersection(double start[3], double change[3])
 {
-  // solve quadratic (only works for objects which started as unit sphere)
   double change_negY[3] = {change[0], -change[1], change[2]};
   double start_negY[3] = {start[0], -start[1], start[2]};
 
@@ -419,8 +452,8 @@ int hyperboloid_to_parametric(double point[3], double P[2])
   // hyperboloid parameterization is (cos(u)sec(v), sin(u)sec(v), tan(v))
   // inverse is u=atan2(z,x), v=atan(y)
   // rescale so that 0<=u,v<=1
-  P[0] = atan2(point[2], point[0]) / M_PI / 2;
-  P[1] = atan(point[1]) / M_PI / 2;
+  P[0] = (atan2(point[2], point[0]) + M_PI) / M_PI / 2;
+  P[1] = (-atan(point[1]) + M_PI / 2) / M_PI;
 }
 // ==========================================================================
 
@@ -476,7 +509,7 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
               normal,
               o_color);
 
-  double new_color[3];
+  double new_color[3] = {0, 0, 0};
 
 
   // recurse!
@@ -610,6 +643,12 @@ int test01()
   if(image_IDs[num_objects] == -1) { printf("File load failure!\n"); exit(0); }
   error = get_xwd_map_dimensions(image_IDs[num_objects],image_size[num_objects]); 
   if(error == -1) { printf("File load failure!\n"); exit(0); }
+  /*
+  color_type[num_objects] = SIMPLE_COLOR;
+  color[num_objects][0] = 1;
+  color[num_objects][1] = 1;
+  color[num_objects][2] = 1;
+  */
 
   reflectivity[num_objects] = 0.0;
 
@@ -628,12 +667,18 @@ int test01()
   num_objects++ ; // don't forget to do this
   //////////////////////////////////////////////////////////////
   color_type[num_objects] = TEXTURE_COLOR;
-  image_IDs[num_objects] = init_xwd_map_from_file("clock.xwd");
+  image_IDs[num_objects] = init_xwd_map_from_file("earth_jeff.xwd");
   if(image_IDs[num_objects] == -1) { printf("File load failure!\n"); exit(0); }
   error = get_xwd_map_dimensions(image_IDs[num_objects],image_size[num_objects]); 
   if(error == -1) { printf("File load failure!\n"); exit(0); }
+  /*
+  color_type[num_objects] = SIMPLE_COLOR;
+  color[num_objects][0] = 1;
+  color[num_objects][1] = 1;
+  color[num_objects][2] = 1;
+  */
 
-  reflectivity[num_objects] = 0.1;
+  reflectivity[num_objects] = 0.0;
 
   Tn = 0 ;
   Ttypelist[Tn] = SX ; Tvlist[Tn] =  2   ; Tn++ ;
@@ -650,12 +695,18 @@ int test01()
   for(int i=0; i<5; ++i) {
     color_type[num_objects] = TEXTURE_COLOR;
     to_parametric[num_objects] = plane_to_parametric;
-    image_IDs[num_objects] = init_xwd_map_from_file("earth_jeff.xwd");
+    image_IDs[num_objects] = init_xwd_map_from_file("clock.xwd");
     if(image_IDs[num_objects] == -1) { printf("File load failure!\n"); exit(0); }
     error = get_xwd_map_dimensions(image_IDs[num_objects],image_size[num_objects]); 
     if(error == -1) { printf("File load failure!\n"); exit(0); }
+    /*
+    color_type[num_objects] = SIMPLE_COLOR;
+    color[num_objects][0] = 1;
+    color[num_objects][1] = 1;
+    color[num_objects][2] = 1;
+    */
 
-    reflectivity[num_objects] = 0;
+    reflectivity[num_objects] = i/5.0;
 
     Tn = 0 ;
     Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.5   ; Tn++ ;
