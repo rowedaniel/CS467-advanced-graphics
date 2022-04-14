@@ -3,7 +3,7 @@
 #include "M3d_matrix_tools.c"
 #include "xwd_tools_03.c"
 
-#define M_HITHER 0.01
+#define M_HITHER 1
 #define M_YON 1000000
 #define M 100
 #define SCREEN_WIDTH 800
@@ -24,6 +24,7 @@ double obinv[M][4][4] ;
 int (*grad[M])(double gradient[3], int onum, double intersection[3]);
 double (*intersection[M])(double start[3], double change[3]);
 int (*to_parametric[M])(double point[3], double P[2]);
+double (*SDF[M])(double point[3]);
 
 int    num_objects ;
 
@@ -62,11 +63,51 @@ int get_color(int onum, double point[3], double rgb[3])
 /////////////////////////////////////////////////////////////////////////
 
 // returns object number and t value for closest object intersected by ray
+// this using ray marching, not ray casting.
 int ray_get_closest_obj(double Rsource[3], double Rtip[3], double point[3], double * ret_t)
 {
-  double t_closest = M_YON + 1;
-  int saved_onum = -1;
+  double obj_p[3], p[3], change[3], t;
+  (*ret_t) = M_YON + 1;
 
+  // change = start - tip (and normalize it)
+  M3d_vector_mult_const(change, Rsource, -1);
+  M3d_vector_add(change, change, Rtip);
+
+  const double change_mag = M3d_magnitude(change);
+  if(change_mag == 0) {
+    return -1;
+  }
+
+  printf("magnitude of change vector: %lf\n", M3d_magnitude(change));
+  for(t=0; t < M_YON/change_mag; t += 10/change_mag)
+  {
+
+
+    // get p = start + t*change
+    M3d_vector_mult_const(p, change, t);
+    M3d_vector_add(p, p, Rsource);
+    for(int onum=0; onum < num_objects; ++onum) {
+      // transform point to object space
+      M3d_mat_mult_pt(obj_p, obinv[onum], p);
+
+      double sdf = SDF[onum](obj_p);
+      if (sdf <= 0) {
+        (*ret_t) = t;
+        return onum;
+      }
+    }
+
+    G_rgb(1,0,0);
+    G_fill_circle(p[0], p[1], 2);
+    
+  }
+
+  return -1;
+
+
+  /*
+  double t_closest = M_YON + 1;
+  double saved_onum = -1;
 
   // line = start + t*change
   for(int onum = 0; onum < num_objects; ++onum) {
@@ -81,7 +122,7 @@ int ray_get_closest_obj(double Rsource[3], double Rtip[3], double point[3], doub
     M3d_mat_mult_pt(start, obinv[onum], start);
     M3d_mat_mult_pt(tip, obinv[onum], tip);
 
-    // subtract start from change
+    // subtract start from tip
     double change[3];
     M3d_vector_mult_const(change, start, -1);
     M3d_vector_add(change, change, tip);
@@ -100,10 +141,12 @@ int ray_get_closest_obj(double Rsource[3], double Rtip[3], double point[3], doub
   }
   (*ret_t) = t_closest;
   return saved_onum;
+  */
 }
 
 int cast_ray(double Rsource[3], double Rtip[3], double point[3])
 {
+  printf("in cast_ray\n");
   double t;
   int saved_onum = ray_get_closest_obj(Rsource, Rtip, point, &t);
   if(saved_onum == -1) {
@@ -298,6 +341,11 @@ int solve_quadratic(double a, double b, double c, double t[2])
 
 
 // ================ Sphere stuff ===============
+double sphere_SDF(double point[3]) {
+  // f(x,y,z) = x^2 + y^2 + z^2 - 1
+  return M3d_dot_product(point, point) - 1;
+}
+
 int sphere_grad(double gradient[3], int onum, double intersection[3]) {
   // for spheres, gradient is <2x, 2y, 2z>
   M3d_mat_mult_pt(gradient, obinv[onum], intersection);
@@ -344,6 +392,14 @@ int sphere_to_parametric(double point[3], double P[2])
 
 
 // ================ plane stuff ===============
+double plane_SDF(double point[3]) {
+  if(-1 > point[0] || point[0] > 1 ||
+     -1 > point[1] || point[1] > 1) {
+    return M_HITHER;
+  }
+  return point[2]*point[2];
+}
+
 int plane_grad(double gradient[3], int onum, double intersection[3]) {
   gradient[0] = 0;
   gradient[1] = 0;
@@ -747,6 +803,7 @@ int test01()
 
     //////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////
+    /*
     color[num_objects][0] = 0.4 ;
     color[num_objects][1] = 0.2 ; 
     color[num_objects][2] = 0.6 ;
@@ -768,8 +825,9 @@ int test01()
     draw[num_objects] = Draw_plane;
     intersection[num_objects] = plane_intersection;
     num_objects++ ; // don't forget to do this
-
+    */
     //////////////////////////////////////////////////////////////
+    /*
     color[num_objects][0] = 0.0 ;
     color[num_objects][1] = 0.8 ; 
     color[num_objects][2] = 0.0 ;
@@ -791,6 +849,7 @@ int test01()
     draw[num_objects] = Draw_plane;
     intersection[num_objects] = plane_intersection;
     num_objects++ ; // don't forget to do this
+    */
 
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 1.0 ;
@@ -813,6 +872,7 @@ int test01()
     grad[num_objects] = sphere_grad;
     draw[num_objects] = Draw_ellipsoid;
     intersection[num_objects] = sphere_intersection;
+    SDF[num_objects] = sphere_SDF;
     num_objects++ ; // don't forget to do this
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.3 ;
@@ -835,6 +895,7 @@ int test01()
     grad[num_objects] = sphere_grad;
     draw[num_objects] = Draw_ellipsoid;
     intersection[num_objects] = sphere_intersection;
+    SDF[num_objects] = sphere_SDF;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.5 ;
@@ -857,6 +918,7 @@ int test01()
     grad[num_objects] = sphere_grad;
     draw[num_objects] = Draw_ellipsoid;
     intersection[num_objects] = sphere_intersection;
+    SDF[num_objects] = sphere_SDF;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.5 ;
@@ -868,8 +930,8 @@ int test01()
     Tn = 0 ;
     Ttypelist[Tn] = SY ; Tvlist[Tn] =  100   ; Tn++ ;
     Ttypelist[Tn] = SX ; Tvlist[Tn] =  100   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  400   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  400   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  600   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  200   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;
@@ -878,8 +940,10 @@ int test01()
     grad[num_objects] = sphere_grad;
     draw[num_objects] = Draw_ellipsoid;
     intersection[num_objects] = sphere_intersection;
+    SDF[num_objects] = sphere_SDF;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
+    /*
     color[num_objects][0] = 0.5 ;
     color[num_objects][1] = 0.5 ; 
     color[num_objects][2] = 0.5 ;
@@ -901,6 +965,7 @@ int test01()
     draw[num_objects] = Draw_hyperbola;
     intersection[num_objects] = hyperboloid_intersection;
     num_objects++ ; // don't forget to do this        
+    */
     //////////////////////////////////////////////////////////////
 
     

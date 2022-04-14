@@ -524,7 +524,7 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
     M3d_vector_add(look, look, point);
     M3d_normalize(look, look);
 
-    // reflection = look - 2(look * normal)normal
+    // reflection = look - 2(look dot normal)normal
     M3d_vector_mult_const(reflection, normal, -2*M3d_dot_product(look, normal));
     M3d_vector_add(reflection, reflection, look);
 
@@ -667,7 +667,7 @@ int test01()
   num_objects++ ; // don't forget to do this
   //////////////////////////////////////////////////////////////
   color_type[num_objects] = TEXTURE_COLOR;
-  image_IDs[num_objects] = init_xwd_map_from_file("earth_jeff.xwd");
+  image_IDs[num_objects] = init_xwd_map_from_file("clock.xwd");
   if(image_IDs[num_objects] == -1) { printf("File load failure!\n"); exit(0); }
   error = get_xwd_map_dimensions(image_IDs[num_objects],image_size[num_objects]); 
   if(error == -1) { printf("File load failure!\n"); exit(0); }
@@ -677,6 +677,29 @@ int test01()
   color[num_objects][1] = 1;
   color[num_objects][2] = 1;
   */
+
+  reflectivity[num_objects] = 1.0;
+
+  Tn = 0 ;
+  Ttypelist[Tn] = SX ; Tvlist[Tn] =  6   ; Tn++ ;
+  Ttypelist[Tn] = SY ; Tvlist[Tn] =  6   ; Tn++ ;
+  Ttypelist[Tn] = SZ ; Tvlist[Tn] =  6   ; Tn++ ;
+  Ttypelist[Tn] = TY ; Tvlist[Tn] =  0   ; Tn++ ;
+  Ttypelist[Tn] = TZ ; Tvlist[Tn] =  -4   ; Tn++ ;
+
+  M3d_make_movement_sequence_matrix(obmat[num_objects], obinv[num_objects], Tn, Ttypelist, Tvlist);
+
+  grad[num_objects] = plane_grad;
+  intersection[num_objects] = plane_intersection;
+  to_parametric[num_objects] = plane_to_parametric;
+  num_objects++ ; // don't forget to do this
+  //////////////////////////////////////////////////////////////
+  /*
+  color_type[num_objects] = TEXTURE_COLOR;
+  image_IDs[num_objects] = init_xwd_map_from_file("earth_jeff.xwd");
+  if(image_IDs[num_objects] == -1) { printf("File load failure!\n"); exit(0); }
+  error = get_xwd_map_dimensions(image_IDs[num_objects],image_size[num_objects]); 
+  if(error == -1) { printf("File load failure!\n"); exit(0); }
 
   reflectivity[num_objects] = 0.0;
 
@@ -691,6 +714,7 @@ int test01()
   intersection[num_objects] = sphere_intersection;
   to_parametric[num_objects] = sphere_to_parametric;
   num_objects++ ; // don't forget to do this
+  */
   //////////////////////////////////////////////////////////////
   for(int i=0; i<5; ++i) {
     color_type[num_objects] = TEXTURE_COLOR;
