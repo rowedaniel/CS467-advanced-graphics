@@ -4,7 +4,7 @@
 #include "xwd_tools_03.c"
 
 #define M_HITHER 1
-#define M_YON 1000000
+#define M_YON 2000
 #define M 100
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
@@ -27,6 +27,37 @@ int (*to_parametric[M])(double point[3], double P[2]);
 double (*SDF[M])(double point[3]);
 
 int    num_objects ;
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+double phi(double point[3]) {
+  // for spheres, phi(x,y,z) = 2/(1 + x^2 + y^2 + z^2)
+  return 2 / (1 + M3d_dot_product(point, point));
+}
+
+double phi_grad(double point[3], double grad[3]) {
+  // note: this is for 2d sphereical geometry only, z is ignored.
+
+  // (taken from Paul Allen)
+  // d(phi)/dx = -4x / (1+x^2+y^2)^2
+  // d(phi)/dy = -4y / (1+x^2+y^2)^2
+  double denom = (1+M3d_dot_product(point, point));
+  denom = denom*denom;
+  M3d_vector_mult_const(grad, point, -4/denom);
+}
+
+double V_second_deriv(double point[3], double V[3], double second_deriv[3]) {
+  double grad[3];
+  phi_grad(point, grad);
+
+  double denom = -phi(point);
+
+  second_deriv[0] = (grad[0]*V[0]*V[0] + 2*grad[1]*V[0]*V[1] - grad[0]*V[1]*V[1]) / denom;
+  second_deriv[1] = (grad[1]*V[1]*V[1] + 2*grad[0]*V[1]*V[0] - grad[1]*V[0]*V[0]) / denom;
+  second_deriv[2] = 0;
+}
 
 
 /////////////////////////////////////////////////////////////////////////
@@ -62,22 +93,92 @@ int get_color(int onum, double point[3], double rgb[3])
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
+int ray_get_closest_obj_recursive(double Rsource[3],
+                                  double change[3],
+                                  int n,
+
+                                  double point[3]
+                                  )
+{
+  if(M3d_magnitude(Rsource) > M_YON || n <= 0) {
+    return -1;
+  }
+
+
+
+  double p[3], end[3];
+  int onum;
+
+
+  G_rgb(1,0,0);
+  G_fill_circle(Rsource[0], Rsource[1], 1);
+  //G_wait_key();
+
+  for(onum=0; onum < num_objects; ++onum) {
+    // transform point to object space
+    M3d_mat_mult_pt(p, obinv[onum], Rsource);
+
+    double sdf = SDF[onum](p);
+    if (sdf <= 0) {
+      //(*ret_t) = 0;
+      M3d_vector_copy(point, Rsource);
+      return onum;
+    }
+  }
+
+  // no collision found at first point, so recurse
+
+  // change = start - tip (and normalize it)
+
+  /*
+  const double change_mag = M3d_magnitude(change);
+  printf("change magnitude: %lf\n", change_mag);
+  if(change_mag == 0) {
+    return -1;
+  }
+  */
+
+  // p = start + change
+  M3d_vector_add(p, Rsource, change);
+
+  // V += dV/dt
+  double dV_dt[3];
+  V_second_deriv(p, change, dV_dt);
+  M3d_vector_add(change, change, dV_dt);
+
+  return ray_get_closest_obj_recursive(p, change, n-1,
+                                       point);
+}
+
 // returns object number and t value for closest object intersected by ray
 // this using ray marching, not ray casting.
 int ray_get_closest_obj(double Rsource[3], double Rtip[3], double point[3], double * ret_t)
 {
-  double obj_p[3], p[3], change[3], t;
-  (*ret_t) = M_YON + 1;
+  // note: ret_t is meaningless in ray marching.
 
-  // change = start - tip (and normalize it)
+  const double step = 1;
+  double change[3];
+
+  // change = Rtip - Rsource
   M3d_vector_mult_const(change, Rsource, -1);
-  M3d_vector_add(change, change, Rtip);
+  M3d_vector_add(change, Rtip, change);
 
-  const double change_mag = M3d_magnitude(change);
-  if(change_mag == 0) {
-    return -1;
-  }
+  printf("magnitude of change: %lf\n", M3d_magnitude(change));
 
+  M3d_normalize(change, change);
+  //M3d_vector_mult_const(change, change, step);
+
+  int onum = ray_get_closest_obj_recursive(Rsource, change, 10000,
+                                           point);
+
+  //(*ret_t) = step;
+  M3d_vector_mult_const(change, change, -1);
+  M3d_vector_add(point, point, change);
+
+
+  return onum;
+
+  /*
   printf("magnitude of change vector: %lf\n", M3d_magnitude(change));
   for(t=0; t < M_YON/change_mag; t += 10/change_mag)
   {
@@ -92,7 +193,7 @@ int ray_get_closest_obj(double Rsource[3], double Rtip[3], double point[3], doub
 
       double sdf = SDF[onum](obj_p);
       if (sdf <= 0) {
-        (*ret_t) = t;
+        (*ret_t) = t - 10/change_mag;
         return onum;
       }
     }
@@ -103,6 +204,7 @@ int ray_get_closest_obj(double Rsource[3], double Rtip[3], double point[3], doub
   }
 
   return -1;
+  */
 
 
   /*
@@ -153,7 +255,10 @@ int cast_ray(double Rsource[3], double Rtip[3], double point[3])
     return -1;
   }
 
+  printf("good collision!\n");
 
+
+  /*
   // get the point of intersection
   // first, calculate change
   double change[3];
@@ -163,6 +268,7 @@ int cast_ray(double Rsource[3], double Rtip[3], double point[3])
   // then get point = Rsource + t(change)
   M3d_vector_mult_const(point, change, t);
   M3d_vector_add(point, Rsource, point);
+  */
 
 
   return saved_onum;
@@ -256,7 +362,6 @@ int Light_Model (double irgb[3],
   // then get the intersection
   double blocking_t;
   int blocking_onum = ray_get_closest_obj(point, light_in_eye_space, point, &blocking_t);
-  // finally subtract p from point to get the vector
 
   if(blocking_onum != -1  && \
     blocking_t < 1)
@@ -562,11 +667,13 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
   // set color to this object's color:
   double o_color[3];
   get_color(saved_onum, point, o_color);
+  /*
   Light_Model(o_color,
               Rtip,
               point,
               normal,
               o_color);
+  */
 
   G_rgb(o_color[0], o_color[1], o_color[2]);
   G_line(Rsource[0], Rsource[1], Rtip[0], Rtip[1]);
@@ -625,7 +732,7 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 
 int ray(double Rsource[3], double Rtip[3], double argb[3])
 {
-  ray_recursive(Rsource, Rtip, argb, 10);
+  ray_recursive(Rsource, Rtip, argb, 3);
 }
 
 
@@ -987,7 +1094,7 @@ int test01()
     light_in_eye_space[1] = 500;
     light_in_eye_space[2] = 0;
 
-    Rsource[0] =  20 ;  Rsource[1] =  400 ;  Rsource[2] = 0 ;    
+    Rsource[0] =  400 ;  Rsource[1] =  400 ;  Rsource[2] = 0 ;    
 
     G_rgb(0,0,0) ;
     G_clear() ;
