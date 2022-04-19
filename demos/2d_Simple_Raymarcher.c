@@ -3,7 +3,7 @@
 #include "M3d_matrix_tools.c"
 #include "xwd_tools_03.c"
 
-#define M_HITHER 1
+#define M_HITHER 0.001
 #define M_YON 2000
 #define M 100
 #define SCREEN_WIDTH 800
@@ -48,7 +48,7 @@ double phi_grad(double point[3], double grad[3]) {
   M3d_vector_mult_const(grad, point, -4/denom);
 }
 
-double V_second_deriv(double point[3], double V[3], double second_deriv[3]) {
+double V_second_deriv(double point[3], double V[3],   double second_deriv[3]) {
   double grad[3];
   phi_grad(point, grad);
 
@@ -66,17 +66,14 @@ double V_second_deriv(double point[3], double V[3], double second_deriv[3]) {
 //////////////////////////////////////////////////////////////////////////////
 
 int coords_to_screen(double screen_pos[2], double point[3]) {
-  screen_pos[0] = (point[0]/100 + 1) * SCREEN_WIDTH / 2;
-  screen_pos[1] = (point[1]/100 + 1) * SCREEN_WIDTH / 2;
+  screen_pos[0] = (point[0]/10 + 1) * SCREEN_WIDTH / 2;
+  screen_pos[1] = (point[1]/10 + 1) * SCREEN_WIDTH / 2;
 }
 
 int debug_draw_point(double point[3])
 {
-  printf("debug drawing point:\n");
-  M3d_print_vector(point);
   double s[2];
   coords_to_screen(s, point);
-  printf("point at: %lf, %lf\n", s[0], s[1]);
   G_rgb(1,0,0);
   G_fill_circle(s[0], s[1], 0.5);
 }
@@ -115,188 +112,68 @@ int get_color(int onum, double point[3], double rgb[3])
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-int ray_get_closest_obj_recursive(double Rsource[3],
-                                  double change[3],
-                                  double step,
-                                  int n,
-
-                                  double point[3]
-                                  )
-{
-  if(M3d_magnitude(Rsource) > M_YON || n <= 0) {
-    return -1;
-  }
-
-
-
-  double p[3], end[3];
-  int onum;
-
-
-  G_rgb(1,0,0);
-  debug_draw_point(Rsource);
-  //G_wait_key();
-
-  for(onum=0; onum < num_objects; ++onum) {
-    // transform point to object space
-    M3d_mat_mult_pt(p, obinv[onum], Rsource);
-
-    double sdf = SDF[onum](p);
-    if (sdf <= 0) {
-      //(*ret_t) = 0;
-      M3d_vector_copy(point, Rsource);
-      return onum;
-    }
-  }
-
-  // no collision found at first point, so recurse
-
-  // change = start - tip (and normalize it)
-
-  /*
-  const double change_mag = M3d_magnitude(change);
-  printf("change magnitude: %lf\n", change_mag);
-  if(change_mag == 0) {
-    return -1;
-  }
-  */
-
-  // p = start + (change * step)
-  M3d_vector_mult_const(p, change, step);
-  M3d_vector_add(p, Rsource, p);
-
-  // V += dV/dt
-  double dV_dt[3];
-  V_second_deriv(p, change, dV_dt);
-  M3d_vector_add(change, change, dV_dt);
-
-  return ray_get_closest_obj_recursive(p, change, step, n-1,
-                                       point);
-}
-
 // returns object number and t value for closest object intersected by ray
 // this using ray marching, not ray casting.
-int ray_get_closest_obj(double Rsource[3], double Rtip[3], double point[3], double * ret_t)
+int cast_ray(double Rsource[3], double Rtip[3], double point[3], double V[3])
 {
-  // note: ret_t is meaningless in ray marching.
+  const double delta_t = 0.0001;
 
-  const double step = 1;
-  double change[3];
+  double dV_dt[3], next_point[3], obj_point[3];
+  int onum;
 
-  // change = Rtip - Rsource
-  M3d_vector_mult_const(change, Rsource, -1);
-  M3d_vector_add(change, Rtip, change);
-
-  //printf("magnitude of change: %lf\n", M3d_magnitude(change));
-
-  M3d_normalize(change, change);
-  M3d_vector_mult_const(change, change, step);
-
-  int onum = ray_get_closest_obj_recursive(Rsource, change, step, 10000,
-                                           point);
-
-  //(*ret_t) = step;
-  M3d_vector_mult_const(change, change, -1);
-  M3d_vector_add(point, point, change);
+  // V = Rtip - Rsource
+  M3d_vector_mult_const(V, Rsource, -1);
+  M3d_vector_add(V, Rtip, V);
+  // currently, normalize V. TODO: should I keep doing this?
+  M3d_normalize(V, V);
 
 
-  return onum;
+  M3d_vector_copy(next_point, Rsource);
 
-  /*
-  printf("magnitude of change vector: %lf\n", M3d_magnitude(change));
-  for(t=0; t < M_YON/change_mag; t += 10/change_mag)
-  {
+  for(int n=0; n < 100000; ++n) {
+
+    if(M3d_magnitude(Rsource) > M_YON) {
+      return -1;
+    }
+
+    // get next point in the ray
+    //
+    // update point to be the old next_point, then
+    // calculate new next_point and update V
+    M3d_vector_copy(point, next_point);
+    // next_point = point + (V * delta_t)
+    M3d_vector_mult_const(next_point, V, delta_t);
+    M3d_vector_add(next_point, next_point, point);
+    // V += dV/dt
+    V_second_deriv(next_point, V,   dV_dt);
+    M3d_vector_mult_const(dV_dt,   dV_dt, delta_t);
+    M3d_vector_add(V,   V, dV_dt);
 
 
-    // get p = start + t*change
-    M3d_vector_mult_const(p, change, t);
-    M3d_vector_add(p, p, Rsource);
-    for(int onum=0; onum < num_objects; ++onum) {
+
+    {
+      // DEBUG
+      G_rgb(1,0,0);
+      debug_draw_point(point);
+      //G_wait_key();
+    }
+
+    // check for collision with any object
+    for(onum=0; onum < num_objects; ++onum) {
       // transform point to object space
-      M3d_mat_mult_pt(obj_p, obinv[onum], p);
+      M3d_mat_mult_pt(obj_point, obinv[onum], next_point);
 
-      double sdf = SDF[onum](obj_p);
+      double sdf = SDF[onum](obj_point);
       if (sdf <= 0) {
-        (*ret_t) = t - 10/change_mag;
         return onum;
       }
     }
 
-    G_rgb(1,0,0);
-    G_fill_circle(p[0], p[1], 2);
-    
   }
 
   return -1;
-  */
-
-
-  /*
-  double t_closest = M_YON + 1;
-  double saved_onum = -1;
-
-  // line = start + t*change
-  for(int onum = 0; onum < num_objects; ++onum) {
-    double tip[3];
-    double start[3];
-  
-    // calculate and start
-    M3d_vector_copy(start, Rsource);
-    M3d_vector_copy(tip, Rtip);
-
-    // transform line to object space
-    M3d_mat_mult_pt(start, obinv[onum], start);
-    M3d_mat_mult_pt(tip, obinv[onum], tip);
-
-    // subtract start from tip
-    double change[3];
-    M3d_vector_mult_const(change, start, -1);
-    M3d_vector_add(change, change, tip);
-
-    double t = intersection[onum](start, change);
-    if(t < t_closest) {
-      // new closest point! Save this one.
-      t_closest = t;
-      saved_onum = onum;
-    }
-  }
-
-  if(t_closest == M_YON + 1) {
-    // no intersection, so give an onum of -1
-    return -1;
-  }
-  (*ret_t) = t_closest;
-  return saved_onum;
-  */
 }
 
-int cast_ray(double Rsource[3], double Rtip[3], double point[3])
-{
-  //printf("in cast_ray\n");
-  double t;
-  int saved_onum = ray_get_closest_obj(Rsource, Rtip, point, &t);
-  if(saved_onum == -1) {
-    return -1;
-  }
-
-  //printf("good collision!\n");
-
-
-  /*
-  // get the point of intersection
-  // first, calculate change
-  double change[3];
-  M3d_vector_mult_const(change, Rsource, -1);
-  M3d_vector_add(change, change, Rtip);
-
-  // then get point = Rsource + t(change)
-  M3d_vector_mult_const(point, change, t);
-  M3d_vector_add(point, Rsource, point);
-  */
-
-
-  return saved_onum;
-}
 
 
 /////////////////////////////////////////////////////////////////////////
@@ -378,6 +255,8 @@ int Light_Model (double irgb[3],
 
   double intensity ;
 
+
+  /*
   // raycast to light, stop if you hit anything
   // first, move point out slightly from start, to prevent colliding with the same object
   double point[3];
@@ -393,6 +272,7 @@ int Light_Model (double irgb[3],
     intensity = AMBIENT;
     goto LLL ;
   }
+  */
 
   if (NdotL*NdotE < 0) {
     // eye and light are on opposite sides of polygon
@@ -473,6 +353,11 @@ int solve_quadratic(double a, double b, double c, double t[2])
 double sphere_SDF(double point[3]) {
   // f(x,y,z) = x^2 + y^2 + z^2 - 1
   return M3d_dot_product(point, point) - 1;
+}
+
+double inv_sphere_SDF(double point[3]) {
+  // inverted sphere where in is out and out is in
+  return -sphere_SDF(point);
 }
 
 int sphere_grad(double gradient[3], int onum, double intersection[3]) {
@@ -675,9 +560,9 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
     argb[j] = 0;
   }
 
-  // get point of intersection
-  double point[3];
-  int saved_onum = cast_ray(Rsource, Rtip, point);
+  // get point of intersection and look vector
+  double point[3], look[3];
+  int saved_onum = cast_ray(Rsource, Rtip, point, look);
   if(saved_onum == -1) {
     // no intersection
     return 0;
@@ -711,13 +596,15 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 
     // calculate reflection angle
     // get transformation matrix to reflect across plane defined by normal vector
-    double look[3], reflection[3];
+    /*
     // look = intersection - source
     M3d_vector_mult_const(look, Rsource, -1);
     M3d_vector_add(look, look, point);
     M3d_normalize(look, look);
+    */
 
     // reflection = look - 2(look * normal)normal
+    double reflection[3];
     M3d_vector_mult_const(reflection, normal, -2*M3d_dot_product(look, normal));
     M3d_vector_add(reflection, reflection, look);
 
@@ -729,9 +616,19 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
     double new_tip[3];
     M3d_vector_add(new_tip, reflection, point);
 
-    G_rgb(o_color[0], o_color[1], o_color[2]);
-    G_line(point[0], point[1], 4000*reflection[0] + point[0], 4000*reflection[1]+ point[1]);
-    G_fill_circle(point[0], point[1], 4);
+    {
+      // DEBUG
+      G_rgb(o_color[0], o_color[1], o_color[2]);
+      double a[2],b[2], debug_tip[3];
+      M3d_vector_mult_const(debug_tip, reflection, 1);
+      M3d_vector_add(debug_tip, debug_tip, point);
+
+      coords_to_screen(a, point);
+      coords_to_screen(b, debug_tip);
+
+      G_line(a[0], a[1], b[0], b[1]);
+      G_fill_circle(a[0], a[1], 4);
+    }
 
     ray_recursive(point, new_tip, new_color, n-1);
 
@@ -762,8 +659,8 @@ int ray(double Rsource[3], double Rtip[3], double argb[3])
 
 
 int screen_to_coords(double point[3], double screen_pos[2]) {
-  point[0] = (screen_pos[0] * 2 / SCREEN_WIDTH - 1)*100;
-  point[1] = (screen_pos[1] * 2 / SCREEN_HEIGHT - 1)*100;
+  point[0] = (screen_pos[0] * 2 / SCREEN_WIDTH - 1)*10;
+  point[1] = (screen_pos[1] * 2 / SCREEN_HEIGHT - 1)*10;
   point[2] = 0; //1;
 }
 
@@ -941,6 +838,30 @@ int test01()
     //////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////
     /*
+    color[num_objects][0] = 0.5 ;
+    color[num_objects][1] = 0.5 ; 
+    color[num_objects][2] = 0.5 ;
+    color_type[num_objects] = SIMPLE_COLOR;
+    reflectivity[num_objects] = 0.5;
+	
+    Tn = 0 ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  15    ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  80   ; Tn++ ;
+    Ttypelist[Tn] = RZ ; Tvlist[Tn] =   97  ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  200   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  530   ; Tn++ ;
+	
+    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+    M3d_mat_mult(obmat[num_objects], vm, m) ;
+    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+
+    grad[num_objects] = hyperboloid_grad;
+    draw[num_objects] = Draw_hyperbola;
+    intersection[num_objects] = hyperboloid_intersection;
+    num_objects++ ; // don't forget to do this        
+    */
+    //////////////////////////////////////////////////////////////
+    /*
     color[num_objects][0] = 0.4 ;
     color[num_objects][1] = 0.2 ; 
     color[num_objects][2] = 0.6 ;
@@ -1058,6 +979,7 @@ int test01()
     intersection[num_objects] = sphere_intersection;
     SDF[num_objects] = sphere_SDF;
     num_objects++ ; // don't forget to do this        
+    */
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.5 ;
     color[num_objects][1] = 0.5 ; 
@@ -1066,10 +988,8 @@ int test01()
     reflectivity[num_objects] = 0.5;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.100   ; Tn++ ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.100   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  0.600   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  0.200   ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  5.000   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  5.000   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;
@@ -1078,31 +998,9 @@ int test01()
     grad[num_objects] = sphere_grad;
     draw[num_objects] = Draw_ellipsoid;
     intersection[num_objects] = sphere_intersection;
-    SDF[num_objects] = sphere_SDF;
+    SDF[num_objects] = inv_sphere_SDF;
     num_objects++ ; // don't forget to do this        
-    //////////////////////////////////////////////////////////////
     /*
-    color[num_objects][0] = 0.5 ;
-    color[num_objects][1] = 0.5 ; 
-    color[num_objects][2] = 0.5 ;
-    color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.5;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  15    ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  80   ; Tn++ ;
-    Ttypelist[Tn] = RZ ; Tvlist[Tn] =   97  ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  200   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  530   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
-
-    grad[num_objects] = hyperboloid_grad;
-    draw[num_objects] = Draw_hyperbola;
-    intersection[num_objects] = hyperboloid_intersection;
-    num_objects++ ; // don't forget to do this        
     */
     //////////////////////////////////////////////////////////////
 
@@ -1138,10 +1036,15 @@ int test01()
       G_rgb(0,0,0) ;
       G_clear() ;
 
-      double s[2], p[2];
+      double origin[3] = {0,0,0};
+      double s[2], p[2], o[2];
       coords_to_screen(s, Rsource);
       coords_to_screen(p, Rtip);
+      coords_to_screen(o, origin);
       G_rgb(1,0,1) ; G_fill_circle(s[0], s[1], 3) ;
+      G_rgb(1,0,1) ; G_fill_circle(p[0], p[1], 3) ;
+      G_rgb(1,0.5,0.2) ; G_fill_circle(o[0], o[1], 3) ;
+
       G_rgb(1,1,0) ; G_line(s[0], s[1], p[0], p[1]) ;
       G_rgb(1,0,1) ; G_line(100,200,  100,600) ;
 
@@ -1154,7 +1057,7 @@ int test01()
     light_in_eye_space[1] = 500;
     light_in_eye_space[2] = 0;
 
-    Rsource[0] =  -50 ;  Rsource[1] =  0.5 ;  Rsource[2] = 0 ;    
+    Rsource[0] =  1 ;  Rsource[1] =  0 ;  Rsource[2] = 0 ;    
 
 
     draw_screen();
@@ -1180,7 +1083,7 @@ int test01()
       ray (Rsource, Rtip, argb) ; 
     }
 
-    G_save_image_to_file("2d_Simple_Raytracer.xwd") ;
+    G_save_image_to_file("2d_Simple_Raymarcher.xwd") ;
 }
 
 
