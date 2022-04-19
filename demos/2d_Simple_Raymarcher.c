@@ -60,6 +60,28 @@ double V_second_deriv(double point[3], double V[3], double second_deriv[3]) {
 }
 
 
+
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
+int coords_to_screen(double screen_pos[2], double point[3]) {
+  screen_pos[0] = (point[0]/100 + 1) * SCREEN_WIDTH / 2;
+  screen_pos[1] = (point[1]/100 + 1) * SCREEN_WIDTH / 2;
+}
+
+int debug_draw_point(double point[3])
+{
+  printf("debug drawing point:\n");
+  M3d_print_vector(point);
+  double s[2];
+  coords_to_screen(s, point);
+  printf("point at: %lf, %lf\n", s[0], s[1]);
+  G_rgb(1,0,0);
+  G_fill_circle(s[0], s[1], 0.5);
+}
+
+
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
@@ -95,6 +117,7 @@ int get_color(int onum, double point[3], double rgb[3])
 
 int ray_get_closest_obj_recursive(double Rsource[3],
                                   double change[3],
+                                  double step,
                                   int n,
 
                                   double point[3]
@@ -111,7 +134,7 @@ int ray_get_closest_obj_recursive(double Rsource[3],
 
 
   G_rgb(1,0,0);
-  G_fill_circle(Rsource[0], Rsource[1], 1);
+  debug_draw_point(Rsource);
   //G_wait_key();
 
   for(onum=0; onum < num_objects; ++onum) {
@@ -138,15 +161,16 @@ int ray_get_closest_obj_recursive(double Rsource[3],
   }
   */
 
-  // p = start + change
-  M3d_vector_add(p, Rsource, change);
+  // p = start + (change * step)
+  M3d_vector_mult_const(p, change, step);
+  M3d_vector_add(p, Rsource, p);
 
   // V += dV/dt
   double dV_dt[3];
   V_second_deriv(p, change, dV_dt);
   M3d_vector_add(change, change, dV_dt);
 
-  return ray_get_closest_obj_recursive(p, change, n-1,
+  return ray_get_closest_obj_recursive(p, change, step, n-1,
                                        point);
 }
 
@@ -163,12 +187,12 @@ int ray_get_closest_obj(double Rsource[3], double Rtip[3], double point[3], doub
   M3d_vector_mult_const(change, Rsource, -1);
   M3d_vector_add(change, Rtip, change);
 
-  printf("magnitude of change: %lf\n", M3d_magnitude(change));
+  //printf("magnitude of change: %lf\n", M3d_magnitude(change));
 
   M3d_normalize(change, change);
-  //M3d_vector_mult_const(change, change, step);
+  M3d_vector_mult_const(change, change, step);
 
-  int onum = ray_get_closest_obj_recursive(Rsource, change, 10000,
+  int onum = ray_get_closest_obj_recursive(Rsource, change, step, 10000,
                                            point);
 
   //(*ret_t) = step;
@@ -248,14 +272,14 @@ int ray_get_closest_obj(double Rsource[3], double Rtip[3], double point[3], doub
 
 int cast_ray(double Rsource[3], double Rtip[3], double point[3])
 {
-  printf("in cast_ray\n");
+  //printf("in cast_ray\n");
   double t;
   int saved_onum = ray_get_closest_obj(Rsource, Rtip, point, &t);
   if(saved_onum == -1) {
     return -1;
   }
 
-  printf("good collision!\n");
+  //printf("good collision!\n");
 
 
   /*
@@ -676,7 +700,7 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
   */
 
   G_rgb(o_color[0], o_color[1], o_color[2]);
-  G_line(Rsource[0], Rsource[1], Rtip[0], Rtip[1]);
+  //G_line(Rsource[0], Rsource[1], Rtip[0], Rtip[1]);
   G_fill_circle(point[0], point[1], 4);
 
   double new_color[3] = {0, 0, 0};
@@ -730,6 +754,7 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
+
 int ray(double Rsource[3], double Rtip[3], double argb[3])
 {
   ray_recursive(Rsource, Rtip, argb, 3);
@@ -737,11 +762,10 @@ int ray(double Rsource[3], double Rtip[3], double argb[3])
 
 
 int screen_to_coords(double point[3], double screen_pos[2]) {
-  point[0] = screen_pos[0] * 2 / SCREEN_WIDTH - 1;
-  point[1] = screen_pos[1] * 2 / SCREEN_HEIGHT - 1;
-  point[2] = 1;
+  point[0] = (screen_pos[0] * 2 / SCREEN_WIDTH - 1)*100;
+  point[1] = (screen_pos[1] * 2 / SCREEN_HEIGHT - 1)*100;
+  point[2] = 0; //1;
 }
-
 
 
 
@@ -817,9 +841,15 @@ void Draw_ellipsoid (int onum)
     xyz[1] = sin(t) ;
     xyz[2] = 0 ;
     M3d_mat_mult_pt(xyz, obmat[onum], xyz) ;
+
+    double p[2];
+    coords_to_screen(p, xyz);
+    G_point(p[0], p[1]);
+    /*
     x = xyz[0] ;
     y = xyz[1] ;
     G_point(x,y) ;
+    */
   }
 }
 
@@ -959,6 +989,7 @@ int test01()
     */
 
     //////////////////////////////////////////////////////////////
+    /*
     color[num_objects][0] = 1.0 ;
     color[num_objects][1] = 0.3 ; 
     color[num_objects][2] = 0.0 ;
@@ -966,11 +997,11 @@ int test01()
     reflectivity[num_objects] = 0.5;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  180   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =   40   ; Tn++ ;
-    Ttypelist[Tn] = RZ ; Tvlist[Tn] =   60   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  400   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  550   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.180   ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.40   ; Tn++ ;
+    Ttypelist[Tn] = RZ ; Tvlist[Tn] =  0.60   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  0.400   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  0.550   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;
@@ -989,11 +1020,11 @@ int test01()
     reflectivity[num_objects] = 0.5;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =   75   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =   35   ; Tn++ ;
-    Ttypelist[Tn] = RZ ; Tvlist[Tn] =  150   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  360   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  500   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.75   ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.35   ; Tn++ ;
+    Ttypelist[Tn] = RZ ; Tvlist[Tn] =  0.150   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  0.360   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  0.500   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;
@@ -1012,11 +1043,11 @@ int test01()
     reflectivity[num_objects] = 0.5;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  130   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =   30   ; Tn++ ;
-    Ttypelist[Tn] = RZ ; Tvlist[Tn] =  -15   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  100   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  700   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.130   ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.30   ; Tn++ ;
+    Ttypelist[Tn] = RZ ; Tvlist[Tn] = -0.15   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  0.100   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  0.700   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;
@@ -1035,10 +1066,10 @@ int test01()
     reflectivity[num_objects] = 0.5;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  100   ; Tn++ ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  100   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  600   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  200   ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.100   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.100   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  0.600   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  0.200   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;
@@ -1090,19 +1121,43 @@ int test01()
     }
     */
 
+
+    // move everything to the side
+    /*
+    double translate[4][4], translatei[4][4];
+    const double dist = 0;
+    M3d_make_translation(translate,   dist, 0, 0);
+    M3d_make_translation(translatei, -dist, 0, 0);
+    for(int onum = 0; onum < num_objects; ++onum) {
+      M3d_mat_mult(obmat[onum], translate, obmat[onum]);
+      M3d_mat_mult(obinv[onum], obinv[onum], translatei);
+    }
+    */
+
+    int draw_screen() {
+      G_rgb(0,0,0) ;
+      G_clear() ;
+
+      double s[2], p[2];
+      coords_to_screen(s, Rsource);
+      coords_to_screen(p, Rtip);
+      G_rgb(1,0,1) ; G_fill_circle(s[0], s[1], 3) ;
+      G_rgb(1,1,0) ; G_line(s[0], s[1], p[0], p[1]) ;
+      G_rgb(1,0,1) ; G_line(100,200,  100,600) ;
+
+
+      Draw_the_scene() ;
+
+    }
+
     light_in_eye_space[0] = 500;
     light_in_eye_space[1] = 500;
     light_in_eye_space[2] = 0;
 
-    Rsource[0] =  400 ;  Rsource[1] =  400 ;  Rsource[2] = 0 ;    
-
-    G_rgb(0,0,0) ;
-    G_clear() ;
-    G_rgb(1,0,1) ; G_fill_circle(Rsource[0], Rsource[1], 3) ;
-    G_rgb(1,0,1) ; G_line(100,200,  100,600) ;
-    Draw_the_scene() ;
+    Rsource[0] =  -50 ;  Rsource[1] =  0.5 ;  Rsource[2] = 0 ;    
 
 
+    draw_screen();
     while(1)
     {
 
@@ -1117,24 +1172,12 @@ int test01()
       Rtip[1] = (p[1]-Rsource[1]) / (p[0] - Rsource[0]) * (Rtip[0] - Rsource[0]) + Rsource[1];
       Rtip[2] = 0;
       */
-      Rtip[0] = p[0];
-      Rtip[1] = p[1];
+      screen_to_coords(Rtip, p);
 
 
-
-      // redraw screen
-      G_rgb(0,0,0) ;
-      G_clear() ;
-  
-      G_rgb(1,0,1) ; G_fill_circle(Rsource[0], Rsource[1], 3) ;
-      G_rgb(1,0,1) ; G_line(100,200,  100,600) ;
-      G_rgb(1,1,1) ; G_draw_string("click here to quit", 50,50) ;
-
-
+      draw_screen();
       // draw ray
-      G_rgb(1,1,0) ; G_line(Rsource[0],Rsource[1],  Rtip[0],Rtip[1]) ;
       ray (Rsource, Rtip, argb) ; 
-      Draw_the_scene() ;
     }
 
     G_save_image_to_file("2d_Simple_Raytracer.xwd") ;
