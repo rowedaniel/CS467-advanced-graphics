@@ -52,11 +52,21 @@ double V_second_deriv(double point[3], double V[3],   double second_deriv[3]) {
   double grad[3];
   phi_grad(point, grad);
 
+  // TODO: ask Paul why I have a -1 here, but he has a +1 here
   double denom = -phi(point);
 
-  second_deriv[0] = (grad[0]*V[0]*V[0] + 2*grad[1]*V[0]*V[1] - grad[0]*V[1]*V[1]) / denom;
-  second_deriv[1] = (grad[1]*V[1]*V[1] + 2*grad[0]*V[1]*V[0] - grad[1]*V[0]*V[0]) / denom;
-  second_deriv[2] = 0;
+  second_deriv[0] = (grad[0]*V[0]*V[0]
+                     + 2*grad[1]*V[0]*V[1] - grad[0]*V[1]*V[1]
+                     + 2*grad[2]*V[0]*V[2] - grad[0]*V[2]*V[2]
+                    ) / denom;
+  second_deriv[1] = (grad[1]*V[1]*V[1]
+                     + 2*grad[0]*V[1]*V[0] - grad[1]*V[0]*V[0]
+                     + 2*grad[2]*V[1]*V[2] - grad[1]*V[2]*V[2]
+                    ) / denom;
+  second_deriv[2] = (grad[2]*V[2]*V[2]
+                     + 0*grad[0]*V[2]*V[0] - grad[2]*V[0]*V[0]
+                     + 0*grad[1]*V[2]*V[1] - grad[2]*V[1]*V[1]
+                    ) / denom;
 }
 
 
@@ -66,15 +76,14 @@ double V_second_deriv(double point[3], double V[3],   double second_deriv[3]) {
 //////////////////////////////////////////////////////////////////////////////
 
 int coords_to_screen(double screen_pos[2], double point[3]) {
-  screen_pos[0] = (point[0]/10 + 1) * SCREEN_WIDTH / 2;
-  screen_pos[1] = (point[1]/10 + 1) * SCREEN_WIDTH / 2;
+  screen_pos[0] = (point[0]/3 + 1) * SCREEN_WIDTH / 2;
+  screen_pos[1] = (point[1]/3 + 1) * SCREEN_WIDTH / 2;
 }
 
 int debug_draw_point(double point[3])
 {
   double s[2];
   coords_to_screen(s, point);
-  G_rgb(1,0,0);
   G_fill_circle(s[0], s[1], 0.5);
 }
 
@@ -116,7 +125,7 @@ int get_color(int onum, double point[3], double rgb[3])
 // this using ray marching, not ray casting.
 int cast_ray(double Rsource[3], double Rtip[3], double point[3], double V[3])
 {
-  const double delta_t = 0.0001;
+  const double delta_t = 0.0005;
 
   double dV_dt[3], next_point[3], obj_point[3];
   int onum;
@@ -130,7 +139,7 @@ int cast_ray(double Rsource[3], double Rtip[3], double point[3], double V[3])
 
   M3d_vector_copy(next_point, Rsource);
 
-  for(int n=0; n < 100000; ++n) {
+  for(int n=0; n < 20000; ++n) {
 
     if(M3d_magnitude(Rsource) > M_YON) {
       return -1;
@@ -153,7 +162,7 @@ int cast_ray(double Rsource[3], double Rtip[3], double point[3], double V[3])
 
     {
       // DEBUG
-      G_rgb(1,0,0);
+      //G_rgb(1,0,0);
       debug_draw_point(point);
       //G_wait_key();
     }
@@ -555,15 +564,19 @@ int get_normal(double normal[3], int onum, double intersection[3]) {
 
 int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 {
+  /*
   // default color to black
   for(int j=0; j<3; ++j) {
     argb[j] = 0;
   }
+  */
 
   // get point of intersection and look vector
   double point[3], look[3];
   int saved_onum = cast_ray(Rsource, Rtip, point, look);
   if(saved_onum == -1) {
+    // TODO: remove debug!
+    G_rgb(1,0,1);
     // no intersection
     return 0;
   }
@@ -585,8 +598,8 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
   */
 
   G_rgb(o_color[0], o_color[1], o_color[2]);
+  debug_draw_point(point);
   //G_line(Rsource[0], Rsource[1], Rtip[0], Rtip[1]);
-  G_fill_circle(point[0], point[1], 4);
 
   double new_color[3] = {0, 0, 0};
 
@@ -654,13 +667,13 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 
 int ray(double Rsource[3], double Rtip[3], double argb[3])
 {
-  ray_recursive(Rsource, Rtip, argb, 3);
+  ray_recursive(Rsource, Rtip, argb, 0);
 }
 
 
 int screen_to_coords(double point[3], double screen_pos[2]) {
-  point[0] = (screen_pos[0] * 2 / SCREEN_WIDTH - 1)*10;
-  point[1] = (screen_pos[1] * 2 / SCREEN_HEIGHT - 1)*10;
+  point[0] = (screen_pos[0] * 2 / SCREEN_WIDTH - 1)*3;
+  point[1] = (screen_pos[1] * 2 / SCREEN_HEIGHT - 1)*3;
   point[2] = 0; //1;
 }
 
@@ -910,19 +923,15 @@ int test01()
     */
 
     //////////////////////////////////////////////////////////////
-    /*
     color[num_objects][0] = 1.0 ;
-    color[num_objects][1] = 0.3 ; 
-    color[num_objects][2] = 0.0 ;
+    color[num_objects][1] = 1.0 ; 
+    color[num_objects][2] = 1.0 ;
     color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.5;
+    reflectivity[num_objects] = 0.0;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.180   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.40   ; Tn++ ;
-    Ttypelist[Tn] = RZ ; Tvlist[Tn] =  0.60   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  0.400   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  0.550   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  3.00   ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  3.00   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;
@@ -931,21 +940,18 @@ int test01()
     grad[num_objects] = sphere_grad;
     draw[num_objects] = Draw_ellipsoid;
     intersection[num_objects] = sphere_intersection;
-    SDF[num_objects] = sphere_SDF;
+    SDF[num_objects] = inv_sphere_SDF;
     num_objects++ ; // don't forget to do this
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.3 ;
     color[num_objects][1] = 0.3 ; 
     color[num_objects][2] = 1.0 ;
     color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.5;
+    reflectivity[num_objects] = 0.0;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.75   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.35   ; Tn++ ;
-    Ttypelist[Tn] = RZ ; Tvlist[Tn] =  0.150   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  0.360   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  0.500   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.10   ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.10   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;
@@ -961,14 +967,14 @@ int test01()
     color[num_objects][1] = 1.0 ; 
     color[num_objects][2] = 1.0 ;
     color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.5;
+    reflectivity[num_objects] = 0.0;
 	
     Tn = 0 ;
     Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.130   ; Tn++ ;
     Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.30   ; Tn++ ;
     Ttypelist[Tn] = RZ ; Tvlist[Tn] = -0.15   ; Tn++ ;
     Ttypelist[Tn] = TX ; Tvlist[Tn] =  0.100   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  0.700   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  2.600   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;
@@ -979,17 +985,18 @@ int test01()
     intersection[num_objects] = sphere_intersection;
     SDF[num_objects] = sphere_SDF;
     num_objects++ ; // don't forget to do this        
-    */
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.5 ;
     color[num_objects][1] = 0.5 ; 
     color[num_objects][2] = 0.5 ;
     color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.5;
+    reflectivity[num_objects] = 0.0;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  5.000   ; Tn++ ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  5.000   ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.800   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.800   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] =  0.900   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] = -1.000   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
     M3d_mat_mult(obmat[num_objects], vm, m) ;
@@ -998,10 +1005,30 @@ int test01()
     grad[num_objects] = sphere_grad;
     draw[num_objects] = Draw_ellipsoid;
     intersection[num_objects] = sphere_intersection;
-    SDF[num_objects] = inv_sphere_SDF;
+    SDF[num_objects] = sphere_SDF;
     num_objects++ ; // don't forget to do this        
-    /*
-    */
+    //////////////////////////////////////////////////////////////
+    color[num_objects][0] = 0.1 ;
+    color[num_objects][1] = 0.5 ; 
+    color[num_objects][2] = 0.0 ;
+    color_type[num_objects] = SIMPLE_COLOR;
+    reflectivity[num_objects] = 0.0;
+	
+    Tn = 0 ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.400   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.200   ; Tn++ ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] = -1.500   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] =  1.000   ; Tn++ ;
+	
+    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+    M3d_mat_mult(obmat[num_objects], vm, m) ;
+    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+
+    grad[num_objects] = sphere_grad;
+    draw[num_objects] = Draw_ellipsoid;
+    intersection[num_objects] = sphere_intersection;
+    SDF[num_objects] = sphere_SDF;
+    num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
 
     
@@ -1046,7 +1073,8 @@ int test01()
       G_rgb(1,0.5,0.2) ; G_fill_circle(o[0], o[1], 3) ;
 
       G_rgb(1,1,0) ; G_line(s[0], s[1], p[0], p[1]) ;
-      G_rgb(1,0,1) ; G_line(100,200,  100,600) ;
+      //G_rgb(1,0,1) ; G_line(s[0]+50,s[1]-50,  s[0]+50,s[1]+50) ;
+
 
 
       Draw_the_scene() ;
@@ -1057,10 +1085,48 @@ int test01()
     light_in_eye_space[1] = 500;
     light_in_eye_space[2] = 0;
 
-    Rsource[0] =  1 ;  Rsource[1] =  0 ;  Rsource[2] = 0 ;    
+    Rsource[0] =  -1 ;  Rsource[1] =  0 ;  Rsource[2] = 0 ;    
 
 
     draw_screen();
+    
+    // first frame, raytrace the whole line
+    Rtip[0] = Rsource[0] + 0.5;
+    Rtip[2] = 0;
+    const int res = 500;
+    double colors[res][3];
+    for(int i=0; i<res; ++i) {
+      Rtip[1] = Rsource[1] + 1*(i*1.0/res  - 0.5);
+
+      argb[0] = 1;
+      argb[1] = 0;
+      argb[2] = 1;
+      ray (Rsource, Rtip, argb) ; 
+      for(int j=0; j<3; ++j) {
+        colors[i][j] = argb[j];
+      }
+    }
+
+    double p1[2], p2[2];
+    Rtip[1] = Rsource[1] + 1*(0  - 0.5);
+    coords_to_screen(p1, Rtip);
+    Rtip[1] = Rsource[1] + 1*(1  - 0.5);
+    coords_to_screen(p2, Rtip);
+
+    G_rgb(1,0,1);
+    G_fill_rectangle(p1[0]-5, p1[1]-5, 10, p2[1]-p1[1]+10);
+
+
+    for(int i=0; i<res; ++i) {
+      Rtip[1] = Rsource[1] + 1*(i*1.0/res  - 0.5);
+
+      double p[2];
+      coords_to_screen(p, Rtip);
+
+      G_rgb(colors[i][0], colors[i][1], colors[i][2]);
+      G_line(p[0]-2, p[1], p[0]+1, p[1]);
+    }
+
     while(1)
     {
 
