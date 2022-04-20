@@ -744,7 +744,7 @@ void Draw_ellipsoid (int onum)
 
   G_rgb (color[onum][0],color[onum][1],color[onum][2]) ;
   
-  n = 1000 ;
+  n = 10000 ;
   for (i = 0 ; i < n ; i++) {
     t = i*2*M_PI/n ;
     xyz[0] = cos(t) ;
@@ -1145,7 +1145,10 @@ int test01()
 
 
       draw_screen();
+
       // draw ray
+      ray (Rsource, Rtip, argb) ; 
+      G_rgb(argb[0], argb[1], argb[2]);
       ray (Rsource, Rtip, argb) ; 
     }
 
