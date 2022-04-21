@@ -22,7 +22,6 @@ double reflectivity[M] ;
 double obmat[M][4][4] ;
 double obinv[M][4][4] ;
 int (*grad[M])(double gradient[3], int onum, double intersection[3]);
-double (*intersection[M])(double start[3], double change[3]);
 int (*to_parametric[M])(double point[3], double P[2]);
 double (*SDF[M])(double point[3]);
 
@@ -75,10 +74,43 @@ double V_second_deriv(double point[3], double V[3],   double second_deriv[3]) {
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-int coords_to_screen(double screen_pos[2], double point[3]) {
-  screen_pos[0] = (point[0]/3 + 1) * SCREEN_WIDTH / 2;
-  screen_pos[1] = (point[1]/3 + 1) * SCREEN_WIDTH / 2;
+
+
+const double scaling = 3;
+
+const double tan_half = 1; // for now, hard-code the half angle to be 45 deg
+const double D = 0.01; // how far the view plane is from the camera
+const double H = D*tan_half;
+const double HalfWinWidth  = 0.5*SCREEN_WIDTH;
+const double HalfWinHeight = 0.5*SCREEN_HEIGHT;
+
+// global view matrix
+double view_mat[4][4], view_inv[4][4];
+
+int screen_to_coords(double point[3], double screen_pos[2]) {
+  point[0] = H*(screen_pos[0] - HalfWinWidth)/HalfWinWidth ;
+  point[1] = H*(screen_pos[1] - HalfWinHeight)/HalfWinHeight ;
+  point[2] = D ;
+  M3d_mat_mult_pt(point,    view_inv, point);
+  if(point[0] != 0.0) {
+    printf("huh\n");
+    M3d_print_vector(point);
+  }
 }
+
+int coords_to_screen(double screen_pos[2], double point[3]) {
+  double tmp[3];
+  M3d_mat_mult_pt(tmp,    view_mat, point);
+  printf("after view mat: "); M3d_print_vector(tmp);
+  screen_pos[0] = tmp[0] * HalfWinWidth  * D / H + HalfWinWidth;
+  screen_pos[1] = tmp[1] * HalfWinHeight * D / H + HalfWinHeight;
+
+  /*
+  screen_pos[0] = (tmp[0]/scaling + 1) * SCREEN_WIDTH / 2;
+  screen_pos[1] = (tmp[1]/scaling + 1) * SCREEN_WIDTH / 2;
+  */
+}
+
 
 int debug_draw_point(double point[3])
 {
@@ -93,6 +125,8 @@ int debug_draw_point(double point[3])
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
+
+// gets an object's base color (prior to light model)
 int get_color(int onum, double point[3], double rgb[3])
 {
   if(color_type[onum] == SIMPLE_COLOR) {
@@ -121,8 +155,12 @@ int get_color(int onum, double point[3], double rgb[3])
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-// returns object number and t value for closest object intersected by ray
-// this using ray marching, not ray casting.
+// casts a ray out from Rsource to Rtip, and checks if it intersects with any object.
+// Returns:
+//   - point[3] - point of intersection with object (typically slightly moved away from object)
+//   - V[3]     - direction the ray came from
+// (though because the geometry is non-Euclidean, will probably not reach Rtip)
+// 
 int cast_ray(double Rsource[3], double Rtip[3], double point[3], double V[3])
 {
   const double delta_t = 0.0005;
@@ -375,29 +413,6 @@ int sphere_grad(double gradient[3], int onum, double intersection[3]) {
   M3d_vector_mult_const(gradient, gradient, 2);
 }
 
-double sphere_intersection(double start[3], double change[3])
-{
-  // solve quadratic (only works for objects which started as unit sphere)
-  double a = M3d_dot_product(change, change);
-  double b = 2*M3d_dot_product(start, change);
-  double c = M3d_dot_product(start, start) -1;
-
-  double t[2];
-  double t_closest = M_YON + 1;
-  int num_solutions = solve_quadratic(a, b, c,  t);
-
-  // find closest solution
-  for(int i = 0; i < num_solutions; ++i) {
-    if(t[i] < 0) {
-      continue;
-    }
-    if(t[i] < t_closest) {
-      t_closest = t[i];
-    }
-  }
-
-  return t_closest;
-}
 int sphere_to_parametric(double point[3], double P[2])
 {
   // parameterization = (cos(u)cos(v), sin(u)cos(v), sin(v))
@@ -428,23 +443,6 @@ int plane_grad(double gradient[3], int onum, double intersection[3]) {
   gradient[1] = 0;
   gradient[2] = 1;
 }
-double plane_intersection(double start[3], double change[3]) {
-  if(change[2] == 0) {
-    return M_YON + 1;
-  }
-  double t = -start[2] / change[2];
-  if(t < 0) {
-    return M_YON + 1;
-  }
-
-  double x = start[0] + t * change[0];
-  double y = start[1] + t * change[1];
-  if(-1 > x || x > 1 ||
-     -1 > y || y > 1) {
-    return M_YON + 1;
-  }
-  return t;
-}
 int plane_to_parametric(double point[3], double P[2])
 {
   // plane parameterization is (u, v, 0)
@@ -461,24 +459,6 @@ int triangle_grad(double gradient[3], int onum, double intersection[3]) {
   gradient[0] = 0;
   gradient[1] = 0;
   gradient[2] = 1;
-}
-double triangle_intersection(double start[3], double change[3]) {
-  // triangle goes from points (0,0,0), (1,0,0), and (0,1,0)
-  if(change[2] == 0) {
-    return M_YON + 1;
-  }
-  double t = -start[2] / change[2];
-  if(t < 0) {
-    return M_YON + 1;
-  }
-
-  double x = start[0] + t * change[0];
-  double y = start[1] + t * change[1];
-  if(0 > x || x > 1 ||
-     0 > y || y > x) {
-    return M_YON + 1;
-  }
-  return t;
 }
 int triangle_to_parametric(double point[3], double P[2])
 {
@@ -497,38 +477,6 @@ int hyperboloid_grad(double gradient[3], int onum, double intersection[3]) {
   gradient[1] *= -1;
 }
 
-double hyperboloid_intersection(double start[3], double change[3])
-{
-  double change_negY[3] = {change[0], -change[1], change[2]};
-  double start_negY[3] = {start[0], -start[1], start[2]};
-
-  double a = M3d_dot_product(change, change_negY);
-  double b = 2*M3d_dot_product(start, change_negY);
-  double c = M3d_dot_product(start, start_negY) -1;
-
-  double t[2];
-  double t_closest = M_YON + 1;
-  int num_solutions = solve_quadratic(a, b, c,  t);
-
-  // find closest solution
-  for(int i = 0; i < num_solutions; ++i) {
-    if(t[i] < 0) {
-      continue;
-    }
-
-    // make sure it's in the hyperbola bounds -1 <= y <= 1
-    double y = start[1] + change[1] * t[i];
-    if(-1 > y || y > 1) {
-      continue;
-    }
-
-    if(t[i] < t_closest) {
-      t_closest = t[i];
-    }
-  }
-
-  return t_closest;
-}
 int hyperboloid_to_parametric(double point[3], double P[2])
 {
   // hyperboloid parameterization is (cos(u)sec(v), sin(u)sec(v), tan(v))
@@ -562,7 +510,7 @@ int get_normal(double normal[3], int onum, double intersection[3]) {
 }
 
 
-int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
+int ray_to_rgb_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 {
   /*
   // default color to black
@@ -643,7 +591,7 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
       G_fill_circle(a[0], a[1], 4);
     }
 
-    ray_recursive(point, new_tip, new_color, n-1);
+    ray_to_rgb_recursive(point, new_tip, new_color, n-1);
 
   }
 
@@ -665,18 +613,10 @@ int ray_recursive(double Rsource[3], double Rtip[3], double argb[3], int n)
 //////////////////////////////////////////////////////////////////////////////
 
 
-int ray(double Rsource[3], double Rtip[3], double argb[3])
+int ray_to_rgb(double Rsource[3], double Rtip[3], double argb[3])
 {
-  ray_recursive(Rsource, Rtip, argb, 0);
+  ray_to_rgb_recursive(Rsource, Rtip, argb, 0);
 }
-
-
-int screen_to_coords(double point[3], double screen_pos[2]) {
-  point[0] = (screen_pos[0] * 2 / SCREEN_WIDTH - 1)*3;
-  point[1] = (screen_pos[1] * 2 / SCREEN_HEIGHT - 1)*3;
-  point[2] = 0; //1;
-}
-
 
 
 int Draw_all(double light[3], double eye[3], double coi[3], double up[3])
@@ -706,7 +646,7 @@ int Draw_all(double light[3], double eye[3], double coi[3], double up[3])
       screen_to_coords(Rtip, screen_pos);
 
 
-      ray (Rsource, Rtip, argb) ; 
+      ray_to_rgb (Rsource, Rtip, argb) ; 
       G_rgb(argb[0], argb[1], argb[2]);
       G_point(screen_pos[0], screen_pos[1]);
 
@@ -750,11 +690,15 @@ void Draw_ellipsoid (int onum)
     xyz[0] = cos(t) ;
     xyz[1] = sin(t) ;
     xyz[2] = 0 ;
+    printf("start           : "); M3d_print_vector(xyz);
     M3d_mat_mult_pt(xyz, obmat[onum], xyz) ;
 
     double p[2];
+    printf("before view mat : "); M3d_print_vector(xyz);
+    M3d_mat_mult_pt(xyz, view_mat, xyz) ;
     coords_to_screen(p, xyz);
     G_point(p[0], p[1]);
+    printf("final           : %lf, %lf\n", p[0], p[1]);
     /*
     x = xyz[0] ;
     y = xyz[1] ;
@@ -834,93 +778,14 @@ void Draw_the_scene()
 
 int test01()
 {
-  double vm[4][4], vi[4][4];
-  double Tvlist[100];
-  int Tn, Ttypelist[100];
-  double m[4][4], mi[4][4];
-  double Rsource[3];
-  double Rtip[3];
-  double argb[3] ;
-
-    //////////////////////////////////////////////////////////////////////
-    M3d_make_identity(vm) ;    M3d_make_identity(vi) ; // OVERRIDE for 2d
-    //////////////////////////////////////////////////////////////////////
+    double Tvlist[100];
+    int Tn, Ttypelist[100];
+    double m[4][4], mi[4][4];
+    double Rsource[3];
+    double Rtip[3];
+    double argb[3] ;
 
     num_objects = 0 ;
-
-    //////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////
-    /*
-    color[num_objects][0] = 0.5 ;
-    color[num_objects][1] = 0.5 ; 
-    color[num_objects][2] = 0.5 ;
-    color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.5;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  15    ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  80   ; Tn++ ;
-    Ttypelist[Tn] = RZ ; Tvlist[Tn] =   97  ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  200   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  530   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
-
-    grad[num_objects] = hyperboloid_grad;
-    draw[num_objects] = Draw_hyperbola;
-    intersection[num_objects] = hyperboloid_intersection;
-    num_objects++ ; // don't forget to do this        
-    */
-    //////////////////////////////////////////////////////////////
-    /*
-    color[num_objects][0] = 0.4 ;
-    color[num_objects][1] = 0.2 ; 
-    color[num_objects][2] = 0.6 ;
-    color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.5;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = RX ; Tvlist[Tn] =   90   ; Tn++ ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =   70   ; Tn++ ;
-    Ttypelist[Tn] = RZ ; Tvlist[Tn] =   25   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  200   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  200   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
-
-    grad[num_objects] = plane_grad;
-    draw[num_objects] = Draw_plane;
-    intersection[num_objects] = plane_intersection;
-    num_objects++ ; // don't forget to do this
-    */
-    //////////////////////////////////////////////////////////////
-    /*
-    color[num_objects][0] = 0.0 ;
-    color[num_objects][1] = 0.8 ; 
-    color[num_objects][2] = 0.0 ;
-    color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.5;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = RX ; Tvlist[Tn] =   90   ; Tn++ ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  100   ; Tn++ ;
-    Ttypelist[Tn] = RZ ; Tvlist[Tn] =   25   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  200   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  160   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
-
-    grad[num_objects] = plane_grad;
-    draw[num_objects] = Draw_plane;
-    intersection[num_objects] = plane_intersection;
-    num_objects++ ; // don't forget to do this
-    */
 
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 1.0 ;
@@ -930,18 +795,18 @@ int test01()
     reflectivity[num_objects] = 0.0;
 	
     Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  3.00   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  3.00   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.10   ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.10   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+    M3d_copy_mat(obmat[num_objects], m);
+    M3d_copy_mat(obinv[num_objects], mi) ;
 
     grad[num_objects] = sphere_grad;
     draw[num_objects] = Draw_ellipsoid;
-    intersection[num_objects] = sphere_intersection;
     SDF[num_objects] = inv_sphere_SDF;
     num_objects++ ; // don't forget to do this
+    /*
     //////////////////////////////////////////////////////////////
     color[num_objects][0] = 0.3 ;
     color[num_objects][1] = 0.3 ; 
@@ -954,12 +819,11 @@ int test01()
     Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.10   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+    M3d_copy_mat(obmat[num_objects], m) ;
+    M3d_copy_mat(obinv[num_objects], mi) ;
 
     grad[num_objects] = sphere_grad;
     draw[num_objects] = Draw_ellipsoid;
-    intersection[num_objects] = sphere_intersection;
     SDF[num_objects] = sphere_SDF;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
@@ -977,12 +841,11 @@ int test01()
     Ttypelist[Tn] = TY ; Tvlist[Tn] =  2.600   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+    M3d_copy_mat(obmat[num_objects], m) ;
+    M3d_copy_mat(obinv[num_objects], mi) ;
 
     grad[num_objects] = sphere_grad;
     draw[num_objects] = Draw_ellipsoid;
-    intersection[num_objects] = sphere_intersection;
     SDF[num_objects] = sphere_SDF;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
@@ -999,12 +862,11 @@ int test01()
     Ttypelist[Tn] = TY ; Tvlist[Tn] = -1.000   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+    M3d_copy_mat(obmat[num_objects], m) ;
+    M3d_copy_mat(obinv[num_objects], mi) ;
 
     grad[num_objects] = sphere_grad;
     draw[num_objects] = Draw_ellipsoid;
-    intersection[num_objects] = sphere_intersection;
     SDF[num_objects] = sphere_SDF;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
@@ -1021,15 +883,15 @@ int test01()
     Ttypelist[Tn] = TY ; Tvlist[Tn] =  1.000   ; Tn++ ;
 	
     M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_mat_mult(obmat[num_objects], vm, m) ;
-    M3d_mat_mult(obinv[num_objects], mi, vi) ;
+    M3d_copy_mat(obmat[num_objects], m) ;
+    M3d_copy_mat(obinv[num_objects], mi) ;
 
     grad[num_objects] = sphere_grad;
     draw[num_objects] = Draw_ellipsoid;
-    intersection[num_objects] = sphere_intersection;
     SDF[num_objects] = sphere_SDF;
     num_objects++ ; // don't forget to do this        
     //////////////////////////////////////////////////////////////
+    */
 
     
 
@@ -1059,6 +921,29 @@ int test01()
     }
     */
 
+    light_in_eye_space[0] = 500;
+    light_in_eye_space[1] = 500;
+    light_in_eye_space[2] = 0;
+
+    // view matrix
+    double eye[3], coi[3], up[3];
+    double origin[3] = {0,0,0};
+
+    eye[0] = -1;
+    eye[1] = 0;
+    eye[2] = 0;
+
+    coi[0] = 0;
+    coi[1] = 0;
+    coi[2] = 0;
+
+    up[0] = eye[0];
+    up[1] = eye[1]-1;
+    up[2] = eye[2];
+
+    M3d_view(view_mat, view_inv, eye, coi, up);
+
+
     int draw_screen() {
       G_rgb(0,0,0) ;
       G_clear() ;
@@ -1078,54 +963,57 @@ int test01()
 
 
       Draw_the_scene() ;
-
     }
 
-    light_in_eye_space[0] = 500;
-    light_in_eye_space[1] = 500;
-    light_in_eye_space[2] = 0;
+    int update_ray_points() {
+    }
 
-    Rsource[0] =  -1 ;  Rsource[1] =  0 ;  Rsource[2] = 0 ;    
 
 
     draw_screen();
     
     // first frame, raytrace the whole line
-    Rtip[0] = Rsource[0] + 0.5;
-    Rtip[2] = 0;
-    const int res = 500;
-    double colors[res][3];
-    for(int i=0; i<res; ++i) {
-      Rtip[1] = Rsource[1] + 1*(i*1.0/res  - 0.5);
+    const int res = 1;
+    double colors[SCREEN_HEIGHT][3];
+
+    // for figuring out points
+    const double tan_half = 1; // for now, hard-code the half angle to be 45 deg
+    double D,H,HalfWinWidth, HalfWinHeight ;
+    D = 0.01; // how far the view plane is from the camera
+    H = D*tan_half;
+    HalfWinWidth  = 0.5*SCREEN_WIDTH; // (not needed for 2d)
+    HalfWinHeight = 0.5*SCREEN_HEIGHT;
+
+    for(int y_pix=0; y_pix<SCREEN_HEIGHT; y_pix += res) {
+      int x_pix = HalfWinWidth;
+      Rtip[0] = H*(x_pix - HalfWinWidth)/HalfWinWidth ;
+      Rtip[1] = H*(y_pix - HalfWinHeight)/HalfWinHeight ;
+      Rtip[2] = D ;
+      M3d_mat_mult_pt(Rsource, view_inv, origin);
+      M3d_mat_mult_pt(Rtip,    view_inv, Rtip);
+
 
       argb[0] = 1;
       argb[1] = 0;
       argb[2] = 1;
-      ray (Rsource, Rtip, argb) ; 
+      ray_to_rgb (Rsource, Rtip, argb) ; 
       for(int j=0; j<3; ++j) {
-        colors[i][j] = argb[j];
+        colors[y_pix][j] = argb[j];
       }
     }
 
+    /*
+    */
     double p1[2], p2[2];
-    Rtip[1] = Rsource[1] + 1*(0  - 0.5);
-    coords_to_screen(p1, Rtip);
-    Rtip[1] = Rsource[1] + 1*(1  - 0.5);
-    coords_to_screen(p2, Rtip);
-
     G_rgb(1,0,1);
-    G_fill_rectangle(p1[0]-5, p1[1]-5, 10, p2[1]-p1[1]+10);
+    G_fill_rectangle(HalfWinWidth-5, 0, 10, SCREEN_HEIGHT);
 
 
-    for(int i=0; i<res; ++i) {
-      Rtip[1] = Rsource[1] + 1*(i*1.0/res  - 0.5);
-
-      double p[2];
-      coords_to_screen(p, Rtip);
-
-      G_rgb(colors[i][0], colors[i][1], colors[i][2]);
-      G_line(p[0]-2, p[1], p[0]+1, p[1]);
+    for(int y_pix=0; y_pix<SCREEN_HEIGHT; y_pix += res) {
+      G_rgb(colors[y_pix][0], colors[y_pix][1], colors[y_pix][2]);
+      G_line(HalfWinWidth-2, y_pix, HalfWinWidth+2, y_pix);
     }
+    G_save_image_to_file("2d_Simple_Raymarcher.xwd") ;
 
     while(1)
     {
@@ -1142,14 +1030,15 @@ int test01()
       Rtip[2] = 0;
       */
       screen_to_coords(Rtip, p);
+      //update_ray_points();
 
 
       draw_screen();
 
       // draw ray
-      ray (Rsource, Rtip, argb) ; 
+      ray_to_rgb (Rsource, Rtip, argb) ; 
       G_rgb(argb[0], argb[1], argb[2]);
-      ray (Rsource, Rtip, argb) ; 
+      ray_to_rgb (Rsource, Rtip, argb) ; 
     }
 
     G_save_image_to_file("2d_Simple_Raymarcher.xwd") ;
