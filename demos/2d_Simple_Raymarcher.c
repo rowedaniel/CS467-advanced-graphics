@@ -25,6 +25,10 @@ int (*grad[M])(double gradient[3], int onum, double intersection[3]);
 int (*to_parametric[M])(double point[3], double P[2]);
 double (*SDF[M])(double point[3]);
 
+double (*phi)(double point[3]);
+double (*phi_grad)(double point[3], double grad[3]);
+double (*V_second_deriv)(double point[3], double V[3],  double second_deriv[3]);
+
 // debugging
 int debug = 0;
 
@@ -34,17 +38,28 @@ int    num_objects ;
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-double phi(double point[3]) {
-  //return 1;
+double euclid_phi(double point[3]) {
+  return 1;
+}
 
+double euclid_phi_grad(double point[3], double grad[3]) {
+  M3d_vector_mult_const(point, point, 0);
+  return 0;
+}
+
+double euclid_V_second_deriv(double point[3], double V[3],   double second_deriv[3]) {
+  M3d_vector_mult_const(second_deriv, point, 0);
+  return 0;
+}
+
+
+
+double sphere_phi(double point[3]) {
   // for spheres, phi(x,y,z) = 2/(1 + x^2 + y^2 + z^2)
   return 2 / (1 + M3d_dot_product(point, point));
 }
 
-double phi_grad(double point[3], double grad[3]) {
-  //M3d_vector_mult_const(point, point, 0);
-  //return 0;
-
+double sphere_phi_grad(double point[3], double grad[3]) {
   // note: this is for 2d sphereical geometry only, z is ignored.
 
   // (taken from Paul Allen)
@@ -55,10 +70,7 @@ double phi_grad(double point[3], double grad[3]) {
   M3d_vector_mult_const(grad, point, -4/denom);
 }
 
-double V_second_deriv(double point[3], double V[3],   double second_deriv[3]) {
-  //M3d_vector_mult_const(second_deriv, second_deriv, 0);
-  //return 0;
-
+double sphere_V_second_deriv(double point[3], double V[3],   double second_deriv[3]) {
   double grad[3];
   phi_grad(point, grad);
 
@@ -803,127 +815,56 @@ void Draw_the_scene()
 /////////////////////////////////////////////////////////////////////////
 
 
-
-
-
-int test01()
-{
+int test01_scene() {
     double Tvlist[100];
     int Tn, Ttypelist[100];
     double m[4][4], mi[4][4];
-    double Rsource[3];
-    double Rtip[3];
-    double argb[3] ;
 
     num_objects = 0 ;
 
     //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 1.0 ;
-    color[num_objects][1] = 1.0 ; 
-    color[num_objects][2] = 1.0 ;
-    color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.0;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.10   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.10   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_copy_mat(obmat[num_objects], m);
-    M3d_copy_mat(obinv[num_objects], mi) ;
+    const double dist = 4;
+    for(int i=0; i<3; ++i) {
+      color[num_objects][0] = 0.0 ;
+      color[num_objects][1] = 0.0 ; 
+      color[num_objects][2] = 0.0 ;
 
-    grad[num_objects] = sphere_grad;
-    draw[num_objects] = Draw_ellipsoid;
-    SDF[num_objects] = sphere_SDF;
-    num_objects++ ; // don't forget to do this
-    //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 0.3 ;
-    color[num_objects][1] = 0.3 ; 
-    color[num_objects][2] = 1.0 ;
-    color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.0;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  2.10   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  2.10   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_copy_mat(obmat[num_objects], m) ;
-    M3d_copy_mat(obinv[num_objects], mi) ;
+      color[num_objects][i] = 1.0 ;
 
-    grad[num_objects] = sphere_grad;
-    draw[num_objects] = Draw_ellipsoid;
-    SDF[num_objects] = inv_sphere_SDF;
-    num_objects++ ; // don't forget to do this        
-    //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 0.1 ;
-    color[num_objects][1] = 0.5 ; 
-    color[num_objects][2] = 0.0 ;
-    color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.0;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.400   ; Tn++ ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.200   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] = -0.800   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  0.800   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_copy_mat(obmat[num_objects], m) ;
-    M3d_copy_mat(obinv[num_objects], mi) ;
-
-    grad[num_objects] = sphere_grad;
-    draw[num_objects] = Draw_ellipsoid;
-    SDF[num_objects] = sphere_SDF;
-    num_objects++ ; // don't forget to do this        
-    //////////////////////////////////////////////////////////////
-    /*
-    color[num_objects][0] = 0.5 ;
-    color[num_objects][1] = 1.0 ; 
-    color[num_objects][2] = 1.0 ;
-    color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.0;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.130   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.30   ; Tn++ ;
-    Ttypelist[Tn] = RZ ; Tvlist[Tn] = -0.15   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  0.100   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] =  2.600   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_copy_mat(obmat[num_objects], m) ;
-    M3d_copy_mat(obinv[num_objects], mi) ;
-
-    grad[num_objects] = sphere_grad;
-    draw[num_objects] = Draw_ellipsoid;
-    SDF[num_objects] = sphere_SDF;
-    num_objects++ ; // don't forget to do this        
-    //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 0.5 ;
-    color[num_objects][1] = 0.5 ; 
-    color[num_objects][2] = 0.5 ;
-    color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.0;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.800   ; Tn++ ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.800   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  0.900   ; Tn++ ;
-    Ttypelist[Tn] = TY ; Tvlist[Tn] = -1.000   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_copy_mat(obmat[num_objects], m) ;
-    M3d_copy_mat(obinv[num_objects], mi) ;
-
-    grad[num_objects] = sphere_grad;
-    draw[num_objects] = Draw_ellipsoid;
-    SDF[num_objects] = sphere_SDF;
-    num_objects++ ; // don't forget to do this        
-    //////////////////////////////////////////////////////////////
-    */
-
+      color_type[num_objects] = SIMPLE_COLOR;
+      reflectivity[num_objects] = 0.0;
     
+      Tn = 0 ;
+      Ttypelist[Tn] = SX ; Tvlist[Tn] =  1        ; Tn++ ;
+      Ttypelist[Tn] = SY ; Tvlist[Tn] =  1        ; Tn++ ;
+      Ttypelist[Tn] = SZ ; Tvlist[Tn] =  1        ; Tn++ ;
+      Ttypelist[Tn] = TZ ; Tvlist[Tn] = -1*dist   ; Tn++ ;
+      Ttypelist[Tn] = TY ; Tvlist[Tn] =  dist*(i-1)   ; Tn++ ;
+    
+      M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+      M3d_copy_mat(obmat[num_objects], m);
+      M3d_copy_mat(obinv[num_objects], mi) ;
+
+      SDF[num_objects] = sphere_SDF;
+      draw[num_objects] = Draw_ellipsoid; // for 2d
+      num_objects++ ; // don't forget to do this
+    }
+    //////////////////////////////////////////////////////////////
+
+}
+
+
+
+
+int test01a()
+{
+
+    test01_scene();
+
+
+    double Rsource[3];
+    double Rtip[3];
+    double argb[3] ;
 
     light_in_eye_space[0] = 500;
     light_in_eye_space[1] = 500;
@@ -945,8 +886,22 @@ int test01()
     up[1] = eye[1]+1;
     up[2] = eye[2];
 
-    M3d_make_translation(view_mat,  eye[0],  eye[1],  eye[2]);
-    M3d_make_translation(view_inv, -eye[0], -eye[1], -eye[2]);
+    // =====================================================
+    // manually make view matrix
+    double Tvlist[100];
+    int Tn, Ttypelist[100];
+    const double scaling = 0.10;
+
+    Tn = 0 ;
+    Ttypelist[Tn] = TX ; Tvlist[Tn] = -eye[0]   ; Tn++ ;
+    Ttypelist[Tn] = TY ; Tvlist[Tn] = -eye[1]   ; Tn++ ;
+    Ttypelist[Tn] = TZ ; Tvlist[Tn] = -eye[2]   ; Tn++ ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  scaling  ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  scaling  ; Tn++ ;
+    Ttypelist[Tn] = SZ ; Tvlist[Tn] =  scaling  ; Tn++ ;
+  
+    M3d_make_movement_sequence_matrix(view_mat, view_inv, Tn, Ttypelist, Tvlist);
+    // =====================================================
 
     debug = 1;
 
@@ -970,9 +925,6 @@ int test01()
 
 
       Draw_the_scene() ;
-    }
-
-    int update_ray_points() {
     }
 
 
@@ -1022,8 +974,7 @@ int test01()
       G_wait_click(p);
       if(p[1] < 50) { break; }
 
-      screen_to_ray(Rtip, p);
-      Rtip[2] = 0;
+      screen_to_coords(Rtip, p);
 
 
       draw_screen();
@@ -1047,76 +998,15 @@ int test01()
 
 
 
-int test02()
+int test01b()
 {
-    double Tvlist[100];
-    int Tn, Ttypelist[100];
-    double m[4][4], mi[4][4];
+    
+    test01_scene();
+
+
     double Rsource[3];
     double Rtip[3];
     double argb[3] ;
-
-    num_objects = 0 ;
-
-    //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 1.0 ;
-    color[num_objects][1] = 1.0 ; 
-    color[num_objects][2] = 1.0 ;
-    color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.0;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.10   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.10   ; Tn++ ;
-    Ttypelist[Tn] = SZ ; Tvlist[Tn] =  0.10   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_copy_mat(obmat[num_objects], m);
-    M3d_copy_mat(obinv[num_objects], mi) ;
-
-    SDF[num_objects] = sphere_SDF;
-    num_objects++ ; // don't forget to do this
-    //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 0.0 ;
-    color[num_objects][1] = 0.0 ; 
-    color[num_objects][2] = 1.0 ;
-    color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.0;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.20   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.20   ; Tn++ ;
-    Ttypelist[Tn] = SZ ; Tvlist[Tn] =  0.10   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  0.50   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_copy_mat(obmat[num_objects], m);
-    M3d_copy_mat(obinv[num_objects], mi) ;
-
-    SDF[num_objects] = sphere_SDF;
-    num_objects++ ; // don't forget to do this
-    //////////////////////////////////////////////////////////////
-    color[num_objects][0] = 0.0 ;
-    color[num_objects][1] = 0.0 ; 
-    color[num_objects][2] = 1.0 ;
-    color_type[num_objects] = SIMPLE_COLOR;
-    reflectivity[num_objects] = 0.0;
-	
-    Tn = 0 ;
-    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.05   ; Tn++ ;
-    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.05   ; Tn++ ;
-    Ttypelist[Tn] = SZ ; Tvlist[Tn] =  0.10   ; Tn++ ;
-    Ttypelist[Tn] = TX ; Tvlist[Tn] =  -0.30   ; Tn++ ;
-	
-    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-    M3d_copy_mat(obmat[num_objects], m);
-    M3d_copy_mat(obinv[num_objects], mi) ;
-
-    SDF[num_objects] = sphere_SDF;
-    num_objects++ ; // don't forget to do this
-    //////////////////////////////////////////////////////////////
-
-
     
     light_in_eye_space[0] = 0;
     light_in_eye_space[1] = 0;
@@ -1128,7 +1018,7 @@ int test02()
 
     eye[0] = 0;
     eye[1] = 0;
-    eye[2] = 2;
+    eye[2] = 1;
 
     coi[0] = 0;
     coi[1] = 0;
@@ -1150,7 +1040,7 @@ int test02()
     double p[2];
     M3d_mat_mult_pt(Rsource, view_inv, origin);
     for(int x_pix=0; x_pix<SCREEN_WIDTH; x_pix += res) {
-      for(int y_pix=0; y_pix<SCREEN_HEIGHT; y_pix += res) {
+      for(int y_pix=300; y_pix<500; y_pix += res) {
     //for(int x_pix = 300; x_pix<500; x_pix += res) {
     //  for(int y_pix = 300; y_pix<500; y_pix += res) {
         p[0] = x_pix;
@@ -1183,6 +1073,19 @@ int test02()
 
 int main()
 {
+
+  /*
+  phi = euclid_phi;
+  phi_grad = euclid_phi_grad;
+  V_second_deriv = euclid_V_second_deriv;
+  */
+
+  phi = sphere_phi;
+  phi_grad = sphere_phi_grad;
+  V_second_deriv = sphere_V_second_deriv;
+  /*
+  */
+
   G_init_graphics(800,800);
-  test02() ;
+  test01b() ;
 }
