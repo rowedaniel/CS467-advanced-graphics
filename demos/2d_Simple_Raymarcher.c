@@ -86,8 +86,8 @@ double sphere_V_second_deriv(double point[3], double V[3],   double second_deriv
                      + 2*grad[2]*V[1]*V[2] - grad[1]*V[2]*V[2]
                     ) / denom;
   second_deriv[2] = (grad[2]*V[2]*V[2]
-                     + 0*grad[0]*V[2]*V[0] - grad[2]*V[0]*V[0]
-                     + 0*grad[1]*V[2]*V[1] - grad[2]*V[1]*V[1]
+                     + 2*grad[0]*V[2]*V[0] - grad[2]*V[0]*V[0]
+                     + 2*grad[1]*V[2]*V[1] - grad[2]*V[1]*V[1]
                     ) / denom;
 }
 
@@ -824,40 +824,44 @@ int test01_scene(double eye[3], double coi[3], double up[3]) {
 
     //////////////////////////////////////////////////////////////
     const double dist = 4;
-    for(int i=0; i<3; ++i) {
-      color[num_objects][0] = 0.0 ;
-      color[num_objects][1] = 0.0 ; 
-      color[num_objects][2] = 0.0 ;
+    for(int x=0; x<3; ++x) {
+      for(int y=1; y<2; ++y) {
+        color[num_objects][0] = 1.0 ;
+        color[num_objects][1] = 1.0 ; 
+        color[num_objects][2] = 1.0 ;
 
-      color[num_objects][i] = 1.0 ;
+        color[num_objects][x] = 0 ;
+        color[num_objects][y] = 0.5 ;
 
-      color_type[num_objects] = SIMPLE_COLOR;
-      reflectivity[num_objects] = 0.0;
-    
-      Tn = 0 ;
-      Ttypelist[Tn] = SX ; Tvlist[Tn] =  1        ; Tn++ ;
-      Ttypelist[Tn] = SY ; Tvlist[Tn] =  1        ; Tn++ ;
-      Ttypelist[Tn] = SZ ; Tvlist[Tn] =  1        ; Tn++ ;
-      Ttypelist[Tn] = TY ; Tvlist[Tn] = 1*dist   ; Tn++ ;
-      Ttypelist[Tn] = TX ; Tvlist[Tn] =  dist*(i-1)   ; Tn++ ;
-    
-      M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
-      M3d_copy_mat(obmat[num_objects], m);
-      M3d_copy_mat(obinv[num_objects], mi) ;
+        color_type[num_objects] = SIMPLE_COLOR;
+        reflectivity[num_objects] = 0.0;
+      
+        Tn = 0 ;
+        Ttypelist[Tn] = SX ; Tvlist[Tn] =  1        ; Tn++ ;
+        Ttypelist[Tn] = SY ; Tvlist[Tn] =  1        ; Tn++ ;
+        Ttypelist[Tn] = SZ ; Tvlist[Tn] =  1        ; Tn++ ;
+        Ttypelist[Tn] = TX ; Tvlist[Tn] = 1*dist   ; Tn++ ;
+        Ttypelist[Tn] = TY ; Tvlist[Tn] =  dist*(x-1)   ; Tn++ ;
+        Ttypelist[Tn] = TZ ; Tvlist[Tn] =  dist*(y-1)   ; Tn++ ;
+      
+        M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+        M3d_copy_mat(obmat[num_objects], m);
+        M3d_copy_mat(obinv[num_objects], mi) ;
 
-      SDF[num_objects] = sphere_SDF;
-      draw[num_objects] = Draw_ellipsoid; // for 2d
-      num_objects++ ; // don't forget to do this
+        SDF[num_objects] = sphere_SDF;
+        draw[num_objects] = Draw_ellipsoid; // for 2d
+        num_objects++ ; // don't forget to do this
+      }
     }
     //////////////////////////////////////////////////////////////
 
     // place camera
-    eye[0] = 0;
+    eye[0] = -1;
     eye[1] = 0;
     eye[2] = 0;
 
     coi[0] = 0;
-    coi[1] = 1;
+    coi[1] = 0;
     coi[2] = 0;
 
     up[0] = eye[0];
@@ -1047,8 +1051,8 @@ int test01b()
     double colors[SCREEN_HEIGHT][3];
 
     M3d_mat_mult_pt(Rsource, view_inv, origin);
-    for(int x_pix=000; x_pix<800; x_pix += res) {
-      for(int y_pix=000; y_pix<800; y_pix += res) {
+    for(int x_pix=0; x_pix<SCREEN_WIDTH; x_pix += res) {
+      for(int y_pix=0; y_pix<SCREEN_HEIGHT; y_pix += res) {
     //for(int x_pix = 300; x_pix<500; x_pix += res) {
     //  for(int y_pix = 300; y_pix<500; y_pix += res) {
         p[0] = x_pix;
@@ -1087,18 +1091,18 @@ int test01b()
 int main()
 {
 
-  /*
   phi = euclid_phi;
   phi_grad = euclid_phi_grad;
   V_second_deriv = euclid_V_second_deriv;
-  */
-
-  phi = sphere_phi;
-  phi_grad = sphere_phi_grad;
-  V_second_deriv = sphere_V_second_deriv;
   /*
   */
 
+  /*
+  phi = sphere_phi;
+  phi_grad = sphere_phi_grad;
+  V_second_deriv = sphere_V_second_deriv;
+  */
+
   G_init_graphics(800,800);
-  test01b() ;
+  test01a() ;
 }
