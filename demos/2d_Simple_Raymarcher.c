@@ -100,7 +100,7 @@ double sphere_V_second_deriv(double point[3], double V[3],   double second_deriv
 
 
 const double scaling = 3;
-const double D = 0.01;
+const double D = 1; //0.01;
 
 const double tan_half = 1; // for now, hard-code the half angle to be 45 deg
 const double H = tan_half;
@@ -114,7 +114,7 @@ int screen_to_camera(double point[3], double screen_pos[2])
 {
   point[0] = H*(screen_pos[0] - HalfWinWidth)/HalfWinWidth ;
   point[1] = H*(screen_pos[1] - HalfWinHeight)/HalfWinHeight ;
-  point[2] = 0;
+  point[2] = 0.0;
 }
 
 int screen_to_ray(double point[3], double screen_pos[2])
@@ -815,7 +815,7 @@ void Draw_the_scene()
 /////////////////////////////////////////////////////////////////////////
 
 
-int test01_scene() {
+int test01_scene(double eye[3], double coi[3], double up[3]) {
     double Tvlist[100];
     int Tn, Ttypelist[100];
     double m[4][4], mi[4][4];
@@ -838,8 +838,8 @@ int test01_scene() {
       Ttypelist[Tn] = SX ; Tvlist[Tn] =  1        ; Tn++ ;
       Ttypelist[Tn] = SY ; Tvlist[Tn] =  1        ; Tn++ ;
       Ttypelist[Tn] = SZ ; Tvlist[Tn] =  1        ; Tn++ ;
-      Ttypelist[Tn] = TZ ; Tvlist[Tn] = -1*dist   ; Tn++ ;
-      Ttypelist[Tn] = TY ; Tvlist[Tn] =  dist*(i-1)   ; Tn++ ;
+      Ttypelist[Tn] = TY ; Tvlist[Tn] = 1*dist   ; Tn++ ;
+      Ttypelist[Tn] = TX ; Tvlist[Tn] =  dist*(i-1)   ; Tn++ ;
     
       M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
       M3d_copy_mat(obmat[num_objects], m);
@@ -851,6 +851,22 @@ int test01_scene() {
     }
     //////////////////////////////////////////////////////////////
 
+    // place camera
+    eye[0] = 0;
+    eye[1] = 0;
+    eye[2] = 0;
+
+    coi[0] = 0;
+    coi[1] = 1;
+    coi[2] = 0;
+
+    up[0] = eye[0];
+    up[1] = eye[1]+1;
+    up[2] = eye[2];
+
+    M3d_view(view_mat, view_inv, eye, coi, up);
+
+
 }
 
 
@@ -859,7 +875,11 @@ int test01_scene() {
 int test01a()
 {
 
-    test01_scene();
+    // view matrix
+    double eye[3], coi[3], up[3];
+    double origin[3] = {0,0,0};
+
+    test01_scene(eye, coi, up);
 
 
     double Rsource[3];
@@ -870,22 +890,6 @@ int test01a()
     light_in_eye_space[1] = 500;
     light_in_eye_space[2] = 0;
 
-    // view matrix
-    double eye[3], coi[3], up[3];
-    double origin[3] = {0,0,0};
-
-    eye[0] = 1;
-    eye[1] = 0;
-    eye[2] = 0;
-
-    coi[0] = 0;
-    coi[1] = 0;
-    coi[2] = 0;
-
-    up[0] = eye[0];
-    up[1] = eye[1]+1;
-    up[2] = eye[2];
-
     // =====================================================
     // manually make view matrix
     double Tvlist[100];
@@ -893,6 +897,7 @@ int test01a()
     const double scaling = 0.10;
 
     Tn = 0 ;
+    //Ttypelist[Tn] = RY ; Tvlist[Tn] =   90      ; Tn++ ;
     Ttypelist[Tn] = TX ; Tvlist[Tn] = -eye[0]   ; Tn++ ;
     Ttypelist[Tn] = TY ; Tvlist[Tn] = -eye[1]   ; Tn++ ;
     Ttypelist[Tn] = TZ ; Tvlist[Tn] = -eye[2]   ; Tn++ ;
@@ -932,13 +937,17 @@ int test01a()
     draw_screen();
     
     // first frame, raytrace the whole line
-    const int res = 10;
+    const int res = 20;
     double colors[SCREEN_HEIGHT][3];
 
     double p[2];
     M3d_mat_mult_pt(Rsource, view_inv, origin);
+    int x_pix = SCREEN_WIDTH;
+    if(eye[0] > 0) {
+      x_pix = 0;
+    }
     for(int y_pix=0; y_pix<SCREEN_HEIGHT; y_pix += res) {
-      int x_pix = SCREEN_WIDTH;
+
       p[0] = x_pix;
       p[1] = y_pix;
 
@@ -956,12 +965,12 @@ int test01a()
 
     double p1[2], p2[2];
     G_rgb(1,0,1);
-    G_fill_rectangle(HalfWinWidth-5, 0, 10, SCREEN_HEIGHT);
+    G_fill_rectangle(x_pix-5, 0, 10, SCREEN_HEIGHT);
 
 
     for(int y_pix=0; y_pix<SCREEN_HEIGHT; y_pix += res) {
       G_rgb(colors[y_pix][0], colors[y_pix][1], colors[y_pix][2]);
-      G_line(HalfWinWidth-2, y_pix, HalfWinWidth+2, y_pix);
+      G_line(x_pix-2, y_pix, x_pix+2, y_pix);
     }
     G_save_image_to_file("2d_Simple_Raymarcher.xwd") ;
 
@@ -976,6 +985,8 @@ int test01a()
 
       screen_to_coords(Rtip, p);
 
+      printf("Rsource: "); M3d_print_vector(Rsource);
+      printf("Rtip: "); M3d_print_vector(Rtip);
 
       draw_screen();
 
@@ -1001,7 +1012,8 @@ int test01a()
 int test01b()
 {
     
-    test01_scene();
+    double eye[3], coi[3], up[3];
+    test01_scene(eye, coi, up);
 
 
     double Rsource[3];
@@ -1013,52 +1025,53 @@ int test01b()
     light_in_eye_space[2] = 10;
 
     // view matrix
-    double eye[3], coi[3], up[3];
     double origin[3] = {0,0,0};
-
-    eye[0] = 0;
-    eye[1] = 0;
-    eye[2] = 1;
-
-    coi[0] = 0;
-    coi[1] = 0;
-    coi[2] = 0;
-
-    up[0] = eye[0];
-    up[1] = eye[1]+1;
-    up[2] = eye[2];
-
-    M3d_view(view_mat, view_inv, eye, coi, up);
-
-    // first frame, raytrace the whole line
-    const int res = 20;
-    double colors[SCREEN_HEIGHT][3];
 
     G_rgb(0, 0.1, 0);
     G_clear();
 
     double p[2];
+
+    int render_point() {
+      screen_to_ray(Rtip, p);
+
+      ray_to_rgb (Rsource, Rtip, argb) ; 
+
+      G_rgb(argb[0], argb[1], argb[2]);
+      G_point(p[0], p[1]);
+      G_display_image();
+    }
+
+    // first frame, raytrace the whole plane
+    const int res = 20;
+    double colors[SCREEN_HEIGHT][3];
+
     M3d_mat_mult_pt(Rsource, view_inv, origin);
-    for(int x_pix=0; x_pix<SCREEN_WIDTH; x_pix += res) {
-      for(int y_pix=300; y_pix<500; y_pix += res) {
+    for(int x_pix=000; x_pix<800; x_pix += res) {
+      for(int y_pix=000; y_pix<800; y_pix += res) {
     //for(int x_pix = 300; x_pix<500; x_pix += res) {
     //  for(int y_pix = 300; y_pix<500; y_pix += res) {
         p[0] = x_pix;
         p[1] = y_pix;
 
-        screen_to_ray(Rtip, p);
-
-        ray_to_rgb (Rsource, Rtip, argb) ; 
-
-        G_rgb(argb[0], argb[1], argb[2]);
-        G_point(x_pix, y_pix);
-        G_display_image();
+        render_point();
       }
     }
 
     printf("finished render\n");
     G_save_image_to_file("2d_Simple_Raymarcher.xwd") ;
-    G_wait_key();
+
+    while(1) {
+      G_wait_click(p);
+      if(p[1] < 50) { break; }
+
+      render_point();
+      printf("Rsource: "); M3d_print_vector(Rsource);
+      printf("Rtip: "); M3d_print_vector(Rtip);
+
+
+    }
+
 }
 
 
