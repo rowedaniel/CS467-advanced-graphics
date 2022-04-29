@@ -71,6 +71,29 @@ double sphere_phi_grad(double point[3], double grad[3]) {
 
 
 
+double blackhole_mass = 2;
+double blackhole_phi(double point[3]) {
+  // Schwartzchild geometry:
+  // phi(x,y,z) = ( 1 + M/2 / sqrt(x^2 + y^2 + z^2) )^2
+  const double val = (1 + (blackhole_mass/2)/M3d_magnitude(point));
+  return val * val;
+}
+
+double blackhole_phi_grad(double point[3],  double grad[3]) {
+  // d(phi)/dx = 2(1 + M/2 / (x^2+y^2+z^2)) [-1/2 (M/2) (x^2+y^2+z^2)^(3/2) (2x)]
+  // d(phi)/dy = 2(1 + M/2 / (x^2+y^2+z^2)) [-1/2 (M/2) (x^2+y^2+z^2)^(3/2) (2y)]
+  // d(phi)/dz = 2(1 + M/2 / (x^2+y^2+z^2)) [-1/2 (M/2) (x^2+y^2+z^2)^(3/2) (2z)]
+  const double mag = M3d_magnitude(point);
+
+  const double I  = 2 * (1 + blackhole_mass/2 / mag);
+  const double II = -blackhole_mass/4 / mag/mag/mag;
+  const double fac = 2*I*II;
+  
+  M3d_vector_mult_const(grad, point, fac);
+}
+
+
+
 double V_second_deriv(double point[3], double V[3],   double second_deriv[3]) {
   double grad[3];
   phi_grad(point, grad);
@@ -191,10 +214,13 @@ int get_color(int onum, double P[2], double rgb[3])
 //   - V[3]     - direction the ray came from
 // (though because the geometry is non-Euclidean, will probably not reach Rtip)
 // 
+
+
+double delta_t = 0.0001;
+double max_ray_distance = 200000;
+
 int cast_ray(double Rsource[3], double Rtip[3], double point[3], double V[3])
 {
-  const double delta_t = 0.0001;
-
   double dV_dt[3], next_point[3], obj_point[3];
   int onum;
 
@@ -207,7 +233,7 @@ int cast_ray(double Rsource[3], double Rtip[3], double point[3], double V[3])
 
   M3d_vector_copy(next_point, Rsource);
 
-  for(int n=0; n < 100000; ++n) {
+  for(int n=0; n < max_ray_distance; ++n) {
 
     if(M3d_magnitude(Rsource) > M_YON) {
       return -1;
