@@ -1,5 +1,5 @@
 
-#include "3sphere_render.c"
+#include "9sphere_render.c"
 
 int main()
 {

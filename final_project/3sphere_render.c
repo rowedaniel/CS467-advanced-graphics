@@ -219,7 +219,7 @@ int do_3d()
     double colors[SCREEN_HEIGHT][3];
 
     M3d_mat_mult_pt(Rsource, view_inv, origin);
-    for(int x_pix=300; x_pix<500; x_pix += res) {
+    for(int x_pix=0; x_pix<SCREEN_WIDTH; x_pix += res) {
       printf("starting x-cycle %d\n", x_pix);
       for(int y_pix=0; y_pix<SCREEN_HEIGHT; y_pix += res) {
     //for(int x_pix = 300; x_pix<500; x_pix += res) {
