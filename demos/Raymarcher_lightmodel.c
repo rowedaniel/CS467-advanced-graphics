@@ -11,8 +11,8 @@
 #define SIMPLE_COLOR 0
 #define TEXTURE_COLOR 1
 #define LIGHT_RESOLUTION 100
-#define LIGHT_OBJ_RES 10
-#define LIGHT_INTERPOLATION_DISTANCE 10
+#define LIGHT_OBJ_RES  50
+#define LIGHT_INTERPOLATION_DISTANCE 5 
 
 // color
 double color_type[M] ;
@@ -208,7 +208,7 @@ int cast_ray(double Rsource[3], double Rtip[3], double point[3], double V[3])
 
   M3d_vector_copy(next_point, Rsource);
 
-  for(int n=0; n < 78000; ++n) {
+  for(int n=0; n < 100000; ++n) {
 
     if(M3d_magnitude(Rsource) > M_YON) {
       return -1;
@@ -260,13 +260,9 @@ int cast_ray(double Rsource[3], double Rtip[3], double point[3], double V[3])
 /////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-// To support the light model :
-double light_in_eye_space[3] ;
-double light_in_world_space[3] ;
-double AMBIENT      = 1.0 ;
-double MAX_DIFFUSE  = 0.5 ;
-double SPECPOW      = 50 ;
 
+// To support the light model :
+double light_in_world_space[3] ;
 
 int bake_light() {
   // for now, just 2D
@@ -289,7 +285,7 @@ int bake_light() {
   // cast out a bunch of rays from the light source
 
 
-  double t, Rtip[3];
+  double u_d, v_d, Rtip[3];
   double point[3], V[3];
 
   int param_u, param_v;
@@ -297,39 +293,48 @@ int bake_light() {
 
   // cast out rays in a sphere around light source
   for( u=0; u<LIGHT_RESOLUTION; ++u) {
+  //for( u=0; u<50; ++u) {
+    //for( v=0; v<1; ++v) {
+    printf("starting u-cycle %d of %d\n", u, LIGHT_RESOLUTION);
     for( v=0; v<LIGHT_RESOLUTION; ++v) {
-    }
 
-    t = u*2*M_PI / LIGHT_RESOLUTION ;
-    Rtip[0] = cos(t) ;
-    Rtip[1] = sin(t) ;
-    Rtip[2] = 0 ;
+      u_d = u*2.0*M_PI / LIGHT_RESOLUTION ;
+      v_d = 0; //v*2*M_PI / LIGHT_RESOLUTION - M_PI;
+      Rtip[0] = cos(u_d)*cos(v) ;
+      Rtip[1] = sin(u_d)*cos(v) ;
+      Rtip[2] = sin(v) ;
 
-    M3d_vector_add(Rtip, light_in_world_space, Rtip);
+      M3d_vector_add(Rtip, light_in_world_space, Rtip);
 
-    onum = cast_ray(light_in_world_space, Rtip, point, V);
-    if(onum == -1) {
-      continue;
-    }
+      onum = cast_ray(light_in_world_space, Rtip, point, V);
+      if(onum == -1) {
+        continue;
+      }
 
-    // move point to object space
-    M3d_mat_mult_pt(point, obinv[onum], point);
+      // move point to object space
+      M3d_mat_mult_pt(point, obinv[onum], point);
 
-    // get parametric coords of point
-    to_parametric[onum](point, param_point);
-    param_u = param_point[0] * (LIGHT_OBJ_RES-1);
-    param_v = param_point[1] * (LIGHT_OBJ_RES-1);
+      // get parametric coords of point
+      to_parametric[onum](point, param_point);
+      param_u = param_point[0] * (LIGHT_OBJ_RES-1);
+      param_v = param_point[1] * (LIGHT_OBJ_RES-1);
 
-    M3d_vector_mult_const(tmp_baked_lights[onum][param_u][param_v], V, -1);
+      M3d_vector_mult_const(tmp_baked_lights[onum][param_u][param_v], V, -1);
 
-    {
-      // DEBUG
-      double p[3],s[2];
-      M3d_mat_mult_pt(point, obmat[onum], point);
-      M3d_vector_mult_const(p, tmp_baked_lights[onum][param_u][param_v], 1);
-      M3d_vector_add(p, point, p);
-      coords_to_screen(s, p);
-      G_fill_circle(s[0], s[1], 2);
+      {
+        if(debug) {
+          // DEBUG
+          double p[3],s[2];
+          M3d_mat_mult_pt(point, obmat[onum], point);
+          M3d_vector_mult_const(p, tmp_baked_lights[onum][param_u][param_v], 1);
+          M3d_vector_add(p, point, p);
+          coords_to_screen(s, p);
+          G_fill_circle(s[0], s[1], 2);
+        }
+      }
+
+
+
     }
   }
 
@@ -348,7 +353,6 @@ int bake_light() {
 
         // if light already hit this point, skip
         if(M3d_magnitude(baked_lights[onum][u][v]) > 0) {
-          printf("onum=%d, skipping: %d, %d\n", onum, u, v);
           continue;
         }
 
@@ -356,40 +360,51 @@ int bake_light() {
             interp_u < u+LIGHT_INTERPOLATION_DISTANCE;
             ++interp_u) {
 
-          if(u < 0 || u >= LIGHT_OBJ_RES) { continue; }
+          if(interp_u < 0 || interp_u >= LIGHT_OBJ_RES) { continue; }
 
           for(interp_v = v-LIGHT_INTERPOLATION_DISTANCE;
               interp_v < v+LIGHT_INTERPOLATION_DISTANCE;
               ++interp_v) {
 
-            if(v < 0 || v >= LIGHT_OBJ_RES) { continue; }
+            if(interp_v < 0 || interp_v >= LIGHT_OBJ_RES) { continue; }
 
             double dist = (interp_u - u)*(interp_u - u) + (interp_v - v)*(interp_v - v);
+            dist /= LIGHT_INTERPOLATION_DISTANCE*LIGHT_INTERPOLATION_DISTANCE;
             M3d_vector_mult_const(tmp,
                                   tmp_baked_lights[onum][interp_u][interp_v],
-                                  1 / (1 + dist));
+                                  1.0 / (1.0 + dist));
             M3d_vector_add(baked_lights[onum][u][v], baked_lights[onum][u][v], tmp);
 
           }
+        }
+
+        const double mag = M3d_magnitude(baked_lights[onum][u][v]);
+        if(mag > 0) {
+          M3d_vector_mult_const(baked_lights[onum][u][v], baked_lights[onum][u][v], 1.0/mag);
         }
       }
     }
   }
 }
 
+
+// light model constants
+double AMBIENT      = 0.2 ;
+double MAX_DIFFUSE  = 0.5 ;
+double SPECPOW      = 50 ;
+
+
 int Light_Model (double irgb[3],
-                 double s[3],
-                 double p[3],
-                 double n[3],
+                 double E[3],
+                 double N[3],
                  double L[3],
                  double argb[3])
 // s,p,n in eyespace
 
 // irgb == inherent color of object (input to this function)
-// s = location of start of ray (probably the eye)
-// p = point on object (input to this function)
+// E = vector from this poin to eye (input to this function)
 // n = normal to the object at p (input to this function)
-// L = vector from this point to light
+// L = vector from this point to light (input to this function)
 // argb == actual color of object (output of this function)
 // globals : AMBIENT, MAX_DIFFUSE, SPECPOW, light_in_eye_space[3]
 
@@ -398,54 +413,32 @@ int Light_Model (double irgb[3],
 
 
 
-
+  // this needs to occur BEFORE you possibly jump to LLL below
+  double max_ambient_and_diffuse = AMBIENT + MAX_DIFFUSE ;
+  double intensity ;
 
   double len ;
-  double N[3] ; 
-  len = sqrt(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]) ;
-  if (len == 0) return 0 ;
-  N[0] = n[0]/len ;  N[1] = n[1]/len ;  N[2] = n[2]/len ;
 
-  double E[3] ;
-  E[0] = s[0] - p[0] ; 
-  E[1] = s[1] - p[1] ; 
-  E[2] = s[2] - p[2] ; 
-  len = sqrt(E[0]*E[0] + E[1]*E[1] + E[2]*E[2]) ;
-  if (len == 0) return 0 ;
-  E[0] /= len ;  E[1] /= len ;  E[2] /= len ;
-  double NdotE = N[0]*E[0] + N[1]*E[1] + N[2]*E[2] ;
-
-  /*
-  double L[3] ;
-  L[0] = light_in_eye_space[0] - p[0] ; 
-  L[1] = light_in_eye_space[1] - p[1] ; 
-  L[2] = light_in_eye_space[2] - p[2] ; 
-  */
-  len = sqrt(L[0]*L[0] + L[1]*L[1] + L[2]*L[2]) ;
-  if (len == 0) return 0 ;
-  L[0] /= len ;  L[1] /= len ;  L[2] /= len ;
-  double NdotL = N[0]*L[0] + N[1]*L[1] + N[2]*L[2] ;
-
-
-  // flip normals if they're pointing the wrong direction
-  if(NdotL < 0) {
-    NdotL = -NdotL;
-    NdotE = -NdotE;
-    M3d_vector_mult_const(N, N, -1);
+  // normalize all vectors
+  if(!M3d_normalize(E, E)) { return 0; }
+  if(!M3d_normalize(N, N)) { return 0; }
+  if(!M3d_normalize(L, L)) {
+    // if L has magnitude 0, then that means it's in shadow, so jump
+    intensity = AMBIENT;
+    goto LLL;
   }
 
 
+  /*
+  printf("E: "); M3d_print_vector(E);
+  printf("N: "); M3d_print_vector(N);
+  printf("L: "); M3d_print_vector(L);
+  */
 
 
+  double NdotE = N[0]*E[0] + N[1]*E[1] + N[2]*E[2] ;
+  double NdotL = N[0]*L[0] + N[1]*L[1] + N[2]*L[2] ;
 
-
-  double max_ambient_and_diffuse = AMBIENT + MAX_DIFFUSE ;
-     // this needs to occur BEFORE you possibly jump to LLL below
-
-
-
-
-  double intensity ;
 
   if (NdotL*NdotE < 0) {
     // eye and light are on opposite sides of polygon
@@ -456,7 +449,6 @@ int Light_Model (double irgb[3],
     N[0] *= (-1.0) ;    N[1] *= (-1.0) ;    N[2] *= (-1.0) ; 
     NdotE *= (-1.0) ;   // don't use NdotE below, probably should eliminate this
   }
-
 
   // ignore Blinn's variant
   double R[3] ; // Reflection vector of incoming light
@@ -472,7 +464,7 @@ int Light_Model (double irgb[3],
 
   double specular ;
   if (EdotR <= 0.0) { specular = 0.0 ; }
-  else { specular = (1.0 - max_ambient_and_diffuse)*pow(EdotR,SPECPOW) ;}
+  else { specular = (1.0 - max_ambient_and_diffuse)*pow(EdotR,SPECPOW) ; }
 
   // printf("%lf %lf\n",diffuse,specular) ;
   intensity = AMBIENT + diffuse + specular ;
@@ -656,48 +648,66 @@ int ray_to_rgb_recursive(double Rsource[3], double Rtip[3], double argb[3], int 
 
 
 
-  double normal[3];
-  double o_color[3];
+  // flip look vector so it points TO eye FROM point
+  M3d_vector_mult_const(look, look, -1);
 
-  // get parametrized coords
+
+  // get parametrized coordinates 
   double o_point[3], P[2];
   M3d_mat_mult_pt(o_point, obinv[saved_onum], point);
   to_parametric[saved_onum](o_point, P);
 
+  // DEBUG: draw point
+  const int param_x = P[0] * (LIGHT_OBJ_RES-1);
+  const int param_y = P[1] * (LIGHT_OBJ_RES-1);
+
+  // calculate normal
+  double normal[3];
+  get_normal(normal, saved_onum, point);
+
+
+
   if(debug) {
-    // DEBUG: draw point
     double p[3], s[2], s2[2];
-    const int x = P[0] * (LIGHT_OBJ_RES-1);
-    const int y = P[1] * (LIGHT_OBJ_RES-1);
-    M3d_vector_mult_const(p, baked_lights[saved_onum][x][y], 1);
+    const int x = param_x;
+    const int y = param_y;
+    const double len = 1;
+
+    // normal vector
+    M3d_vector_mult_const(p, normal, len);
     M3d_vector_add(p, point, p);
     coords_to_screen(s, p);
     coords_to_screen(s2, point);
     G_line(s[0], s[1], s2[0], s2[1]);
-    printf("rgb onum=%d, (u,v) = %d, %d\n", saved_onum, x, y);
+
+    // light vector
+    M3d_vector_mult_const(p, baked_lights[saved_onum][x][y], len);
+    M3d_vector_add(p, point, p);
+    coords_to_screen(s, p);
+    coords_to_screen(s2, point);
+    G_rgb(1,1,0);
+    G_line(s[0], s[1], s2[0], s2[1]);
+
+    // look vector
+    M3d_vector_mult_const(p, look, len);
+    M3d_vector_add(p, point, p);
+    coords_to_screen(s, p);
+    coords_to_screen(s2, point);
+    G_rgb(0,1,0);
+    G_line(s[0], s[1], s2[0], s2[1]);
   }
 
-  // get color
-  get_color(saved_onum, P, o_color);
 
 
-
-  // for now, no light model
-  // instead, just set color to this object's color:
-
-  /*
-  // calculate normal
-  get_normal(normal, saved_onum, point);
 
   // set color to this object's color:
   double o_color[3];
   get_color(saved_onum, point, o_color);
   Light_Model(o_color,
-              Rtip,
-              point,
+              look,
               normal,
+              baked_lights[saved_onum][param_x][param_y],
               o_color);
-  */
 
   G_rgb(o_color[0], o_color[1], o_color[2]);
   debug_draw_point(point);
@@ -984,7 +994,7 @@ int test01_scene(double eye[3], double coi[3], double up[3]) {
     up[2] = eye[2];
 
     light_in_world_space[0] = -1;
-    light_in_world_space[1] = 5;
+    light_in_world_space[1] = 0;
     light_in_world_space[2] = 0;
 
 
@@ -1138,6 +1148,7 @@ int test01b()
     double eye[3], coi[3], up[3];
     test01_scene(eye, coi, up);
 
+    bake_light();
 
     double Rsource[3];
     double Rtip[3];
@@ -1146,7 +1157,8 @@ int test01b()
     // view matrix
     double origin[3] = {0,0,0};
 
-    G_rgb(0, 0.1, 0);
+    //G_rgb(0, 0.1, 0);
+    G_rgb(0, 0, 0);
     G_clear();
 
     double p[2];
@@ -1162,12 +1174,12 @@ int test01b()
     }
 
     // first frame, raytrace the whole plane
-    const int res = 20;
+    const int res = 5;
     double colors[SCREEN_HEIGHT][3];
 
     M3d_mat_mult_pt(Rsource, view_inv, origin);
-    for(int x_pix=0; x_pix<SCREEN_WIDTH; x_pix += res) {
-      for(int y_pix=0; y_pix<SCREEN_HEIGHT; y_pix += res) {
+    for(int x_pix=300; x_pix<500; x_pix += res) {
+      for(int y_pix=250; y_pix<650; y_pix += res) {
     //for(int x_pix = 300; x_pix<500; x_pix += res) {
     //  for(int y_pix = 300; y_pix<500; y_pix += res) {
         p[0] = x_pix;
@@ -1206,16 +1218,16 @@ int test01b()
 int main()
 {
 
+  /*
   phi = euclid_phi;
   phi_grad = euclid_phi_grad;
-  /*
   */
 
-  /*
   phi = sphere_phi;
   phi_grad = sphere_phi_grad;
+  /*
   */
 
   G_init_graphics(800,800);
-  test01a() ;
+  test01b() ;
 }
