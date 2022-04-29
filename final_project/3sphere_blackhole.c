@@ -10,15 +10,13 @@ int build_scene(double eye[3], double coi[3], double up[3]) {
     num_objects = 0 ;
 
     //////////////////////////////////////////////////////////////
-    const double dist = 4;
-    for(int x=0; x<3; ++x) {
-      for(int y=1; y<2; ++y) {
-        color[num_objects][0] = 1.0 ;
-        color[num_objects][1] = 1.0 ; 
-        color[num_objects][2] = 1.0 ;
-
-        color[num_objects][x] = 0 ;
-        color[num_objects][y] = 0.5 ;
+    const double dist = 6;
+    const double gridSize = 28;
+    for(int x=0; x<gridSize; ++x) {
+      for(int y=gridSize/2; y<gridSize/2+1; ++y) {
+        color[num_objects][0] =       x * 1.0 / gridSize;
+        color[num_objects][1] = 1.0 - x * 1.0 / gridSize;
+        color[num_objects][2] = 0 * 1.0 / gridSize;
 
         color_type[num_objects] = SIMPLE_COLOR;
         reflectivity[num_objects] = 0.0;
@@ -28,8 +26,8 @@ int build_scene(double eye[3], double coi[3], double up[3]) {
         Ttypelist[Tn] = SY ; Tvlist[Tn] =  1        ; Tn++ ;
         Ttypelist[Tn] = SZ ; Tvlist[Tn] =  1        ; Tn++ ;
         Ttypelist[Tn] = TX ; Tvlist[Tn] = 1*dist   ; Tn++ ;
-        Ttypelist[Tn] = TY ; Tvlist[Tn] =  dist*(x-1)   ; Tn++ ;
-        Ttypelist[Tn] = TZ ; Tvlist[Tn] =  dist*(y-1)   ; Tn++ ;
+        Ttypelist[Tn] = TY ; Tvlist[Tn] = 2.0 * (x-gridSize/2)   ; Tn++ ;
+        Ttypelist[Tn] = TZ ; Tvlist[Tn] = 2.0 * (y-gridSize/2)   ; Tn++ ;
       
         M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
         M3d_copy_mat(obmat[num_objects], m);
@@ -46,7 +44,7 @@ int build_scene(double eye[3], double coi[3], double up[3]) {
     //////////////////////////////////////////////////////////////
 
     // place camera
-    eye[0] = -1;
+    eye[0] = -20;
     eye[1] = 0;
     eye[2] = 0;
 
@@ -84,7 +82,7 @@ int do_2d()
     // manually make view matrix
     double Tvlist[100];
     int Tn, Ttypelist[100];
-    const double scaling = 0.10;
+    const double scaling = 0.03;
 
     Tn = 0 ;
     //Ttypelist[Tn] = RY ; Tvlist[Tn] =   90      ; Tn++ ;
@@ -145,27 +143,30 @@ int do_2d()
 
       screen_to_coords(Rtip, p);
 
-
-      argb[0] = 1;
-      argb[1] = 0;
-      argb[2] = 1;
+      debug = 0;
       ray_to_rgb (Rsource, Rtip, argb) ; 
+      if(!(argb[0] == 0 && argb[1] == 0 && argb[2] == 0)) {
+        G_rgb(argb[0], argb[1], argb[2]);
+        debug = 1;
+        ray_to_rgb (Rsource, Rtip, argb) ; 
+      }
       for(int j=0; j<3; ++j) {
         colors[y_pix][j] = argb[j];
       }
     }
 
     double p1[2], p2[2];
-    G_rgb(1,0,1);
-    G_fill_rectangle(x_pix-5, 0, 10, SCREEN_HEIGHT);
+    //G_rgb(1,0,1);
+    //G_fill_rectangle(x_pix-10, 0, 20, SCREEN_HEIGHT);
 
 
     for(int y_pix=0; y_pix<SCREEN_HEIGHT; y_pix += res) {
       G_rgb(colors[y_pix][0], colors[y_pix][1], colors[y_pix][2]);
-      G_line(x_pix-2, y_pix, x_pix+2, y_pix);
+      G_line(x_pix-8, y_pix, x_pix+8, y_pix);
     }
     G_save_image_to_file("Raymarcher.xwd") ;
 
+    debug = 1;
     while(1)
     {
 
