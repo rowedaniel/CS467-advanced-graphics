@@ -1,6 +1,6 @@
 
-#include "FPToolkit.c"
-//#include "M3d_matrix_tools.c"
+//#include "FPToolkit.c"
+#include "M3d_matrix_tools.c"
 #include "xwd_tools_03.c"
 
 #define M_HITHER 0.001
@@ -33,6 +33,7 @@ double (*phi_grad)(double point[3], double grad[3]);
 // debugging
 int debug = 0;
 int do_lightmodel = 0;
+int id;
 
 int    num_objects ;
 /////////////////////////////////////////////////////////////////////////
