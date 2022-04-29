@@ -127,55 +127,24 @@ int do_2d()
 
     draw_screen();
     bake_light();
-    G_wait_key();
+    //G_wait_key();
     
     // first frame, raytrace the whole line
     double colors[SCREEN_HEIGHT][3];
 
-    double p[2];
-    M3d_mat_mult_pt(Rsource, view_inv, origin);
-    int x_pix = SCREEN_WIDTH;
-    if(eye[0] > 0) {
-      x_pix = 0;
-    }
-    for(int y_pix=0; y_pix<SCREEN_HEIGHT; y_pix += res) {
-
-      p[0] = x_pix;
-      p[1] = y_pix;
-
-      screen_to_coords(Rtip, p);
-
-
-      argb[0] = 1;
-      argb[1] = 0;
-      argb[2] = 1;
-      ray_to_rgb (Rsource, Rtip, argb) ; 
-      for(int j=0; j<3; ++j) {
-        colors[y_pix][j] = argb[j];
-      }
-    }
-
-    double p1[2], p2[2];
-    //G_rgb(1,0,1);
-    //G_fill_rectangle(x_pix-5, 0, 10, SCREEN_HEIGHT);
-
-
-    for(int y_pix=0; y_pix<SCREEN_HEIGHT; y_pix += res) {
-      G_rgb(colors[y_pix][0], colors[y_pix][1], colors[y_pix][2]);
-      G_line(x_pix-8, y_pix, x_pix+8, y_pix);
-    }
-    G_save_image_to_file("Raymarcher.xwd") ;
+    double p[2], s[2];
 
     while(1)
     {
 
 
-
-      double p[2];
+      G_wait_click(s);
+      if(s[1] < 50) { break; }
       G_wait_click(p);
       if(p[1] < 50) { break; }
 
       screen_to_coords(Rtip, p);
+      screen_to_coords(Rsource, s);
 
       //printf("Rsource: "); M3d_print_vector(Rsource);
       //printf("Rtip: "); M3d_print_vector(Rtip);
