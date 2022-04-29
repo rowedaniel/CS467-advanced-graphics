@@ -1,6 +1,6 @@
 
 #include "FPToolkit.c"
-#include "M3d_matrix_tools.c"
+//#include "M3d_matrix_tools.c"
 #include "xwd_tools_03.c"
 
 #define M_HITHER 0.001
@@ -153,7 +153,7 @@ int debug_draw_point(double point[3])
   double s[2];
   //printf("before view mat : "); M3d_print_vector(point);
   coords_to_screen(s, point);
-  G_fill_circle(s[0], s[1], 0.5);
+  //G_fill_circle(s[0], s[1], 0.5);
 }
 
 
@@ -230,9 +230,9 @@ int cast_ray(double Rsource[3], double Rtip[3], double point[3], double V[3])
 
     {
       // DEBUG
-      //G_rgb(1,0,0);
+      ////G_rgb(1,0,0);
       debug_draw_point(point);
-      //G_wait_key();
+      ////G_wait_key();
     }
 
     // check for collision with any object
@@ -334,7 +334,7 @@ int bake_light() {
           M3d_vector_mult_const(p, tmp_baked_lights[onum][param_u][param_v], 1);
           M3d_vector_add(p, point, p);
           coords_to_screen(s, p);
-          G_fill_circle(s[0], s[1], 2);
+          //G_fill_circle(s[0], s[1], 2);
         }
       }
 
@@ -689,23 +689,23 @@ int ray_to_rgb_recursive(double Rsource[3], double Rtip[3], double argb[3], int 
       M3d_vector_add(p, point, p);
       coords_to_screen(s, p);
       coords_to_screen(s2, point);
-      G_line(s[0], s[1], s2[0], s2[1]);
+      //G_line(s[0], s[1], s2[0], s2[1]);
 
       // light vector
       M3d_vector_mult_const(p, baked_lights[saved_onum][x][y], len);
       M3d_vector_add(p, point, p);
       coords_to_screen(s, p);
       coords_to_screen(s2, point);
-      G_rgb(1,1,0);
-      G_line(s[0], s[1], s2[0], s2[1]);
+      //G_rgb(1,1,0);
+      //G_line(s[0], s[1], s2[0], s2[1]);
 
       // look vector
       M3d_vector_mult_const(p, look, len);
       M3d_vector_add(p, point, p);
       coords_to_screen(s, p);
       coords_to_screen(s2, point);
-      G_rgb(0,1,0);
-      G_line(s[0], s[1], s2[0], s2[1]);
+      //G_rgb(0,1,0);
+      //G_line(s[0], s[1], s2[0], s2[1]);
     }
 
 
@@ -718,9 +718,9 @@ int ray_to_rgb_recursive(double Rsource[3], double Rtip[3], double argb[3], int 
                 o_color);
   }
 
-  G_rgb(o_color[0], o_color[1], o_color[2]);
+  //G_rgb(o_color[0], o_color[1], o_color[2]);
   debug_draw_point(point);
-  //G_line(Rsource[0], Rsource[1], Rtip[0], Rtip[1]);
+  ////G_line(Rsource[0], Rsource[1], Rtip[0], Rtip[1]);
 
   double new_color[3] = {0, 0, 0};
 
@@ -752,7 +752,7 @@ int ray_to_rgb_recursive(double Rsource[3], double Rtip[3], double argb[3], int 
 
     {
       // DEBUG
-      G_rgb(o_color[0], o_color[1], o_color[2]);
+      //G_rgb(o_color[0], o_color[1], o_color[2]);
       double a[2],b[2], debug_tip[3];
       M3d_vector_mult_const(debug_tip, reflection, 1);
       M3d_vector_add(debug_tip, debug_tip, point);
@@ -760,8 +760,8 @@ int ray_to_rgb_recursive(double Rsource[3], double Rtip[3], double argb[3], int 
       coords_to_screen(a, point);
       coords_to_screen(b, debug_tip);
 
-      G_line(a[0], a[1], b[0], b[1]);
-      G_fill_circle(a[0], a[1], 4);
+      //G_line(a[0], a[1], b[0], b[1]);
+      //G_fill_circle(a[0], a[1], 4);
     }
 
     ray_to_rgb_recursive(point, new_tip, new_color, n-1);
@@ -821,8 +821,8 @@ int Draw_all(double light[3], double eye[3], double coi[3], double up[3])
 
 
       ray_to_rgb (Rsource, Rtip, argb) ; 
-      G_rgb(argb[0], argb[1], argb[2]);
-      G_point(screen_pos[0], screen_pos[1]);
+      //G_rgb(argb[0], argb[1], argb[2]);
+      //G_point(screen_pos[0], screen_pos[1]);
 
       if(argb[0] != 0) {
         // printf("Rsource: \n");
@@ -855,7 +855,7 @@ void Draw_ellipsoid (int onum)
   double t, xyz[3] ;
   double x,y ;
 
-  G_rgb (color[onum][0],color[onum][1],color[onum][2]) ;
+  //G_rgb (color[onum][0],color[onum][1],color[onum][2]) ;
   
   n = 10000 ;
   for (i = 0 ; i < n ; i++) {
@@ -870,12 +870,12 @@ void Draw_ellipsoid (int onum)
     //printf("before view mat : "); M3d_print_vector(xyz);
     //M3d_mat_mult_pt(xyz, view_mat, xyz) ;
     coords_to_screen(p, xyz);
-    G_point(p[0], p[1]);
+    //G_point(p[0], p[1]);
     //printf("final           : %lf, %lf\n", p[0], p[1]);
     /*
     x = xyz[0] ;
     y = xyz[1] ;
-    G_point(x,y) ;
+    //G_point(x,y) ;
     */
   }
 }
@@ -887,7 +887,7 @@ void Draw_plane (int onum)
   double t, xyz[3] ;
   double x,y ;
 
-  G_rgb (color[onum][0],color[onum][1],color[onum][2]) ;
+  //G_rgb (color[onum][0],color[onum][1],color[onum][2]) ;
   
   n = 1000 ;
   for (i = 0 ; i < n ; i++) {
@@ -898,7 +898,7 @@ void Draw_plane (int onum)
     M3d_mat_mult_pt(xyz, obmat[onum], xyz) ;
     x = xyz[0] ;
     y = xyz[1] ;
-    G_point(x,y) ;
+    //G_point(x,y) ;
   }
 }
 
@@ -908,7 +908,7 @@ void Draw_hyperbola(int onum)
   double t, xyz[3] ;
   double x,y ;
 
-  G_rgb (color[onum][0],color[onum][1],color[onum][2]) ;
+  //G_rgb (color[onum][0],color[onum][1],color[onum][2]) ;
   
   n = 1000 ;
   for (i = 0 ; i < n ; i++) {
@@ -922,7 +922,7 @@ void Draw_hyperbola(int onum)
     M3d_mat_mult_pt(xyz, obmat[onum], xyz) ;
     x = xyz[0] ;
     y = xyz[1] ;
-    G_point(x,y) ;
+    //G_point(x,y) ;
   }
 }
 // ==========================================================================
@@ -1053,20 +1053,20 @@ int test01a()
 
 
     int draw_screen() {
-      G_rgb(0,0,0) ;
-      G_clear() ;
+      //G_rgb(0,0,0) ;
+      //G_clear() ;
 
       double origin[3] = {0,0,0};
       double s[2], p[2], o[2];
       coords_to_screen(s, Rsource);
       coords_to_screen(p, Rtip);
       coords_to_screen(o, origin);
-      G_rgb(1,0,1) ; G_fill_circle(s[0], s[1], 3) ;
-      G_rgb(1,0,1) ; G_fill_circle(p[0], p[1], 3) ;
-      G_rgb(1,0.5,0.2) ; G_fill_circle(o[0], o[1], 3) ;
+      //G_rgb(1,0,1) ; G_fill_circle(s[0], s[1], 3) ;
+      //G_rgb(1,0,1) ; G_fill_circle(p[0], p[1], 3) ;
+      //G_rgb(1,0.5,0.2) ; G_fill_circle(o[0], o[1], 3) ;
 
-      G_rgb(1,1,0) ; G_line(s[0], s[1], p[0], p[1]) ;
-      //G_rgb(1,0,1) ; G_line(s[0]+50,s[1]-50,  s[0]+50,s[1]+50) ;
+      //G_rgb(1,1,0) ; G_line(s[0], s[1], p[0], p[1]) ;
+      ////G_rgb(1,0,1) ; G_line(s[0]+50,s[1]-50,  s[0]+50,s[1]+50) ;
 
 
 
@@ -1077,7 +1077,7 @@ int test01a()
 
     draw_screen();
     bake_light();
-    G_wait_key();
+    //G_wait_key();
     
     // first frame, raytrace the whole line
     const int res = 20;
@@ -1107,15 +1107,15 @@ int test01a()
     }
 
     double p1[2], p2[2];
-    G_rgb(1,0,1);
-    G_fill_rectangle(x_pix-5, 0, 10, SCREEN_HEIGHT);
+    //G_rgb(1,0,1);
+    //G_fill_rectangle(x_pix-5, 0, 10, SCREEN_HEIGHT);
 
 
     for(int y_pix=0; y_pix<SCREEN_HEIGHT; y_pix += res) {
-      G_rgb(colors[y_pix][0], colors[y_pix][1], colors[y_pix][2]);
-      G_line(x_pix-2, y_pix, x_pix+2, y_pix);
+      //G_rgb(colors[y_pix][0], colors[y_pix][1], colors[y_pix][2]);
+      //G_line(x_pix-2, y_pix, x_pix+2, y_pix);
     }
-    G_save_image_to_file("2d_Simple_Raymarcher.xwd") ;
+    //G_save_image_to_file("2d_Simple_Raymarcher.xwd") ;
 
     while(1)
     {
@@ -1123,7 +1123,7 @@ int test01a()
 
 
       double p[2];
-      G_wait_click(p);
+      //G_wait_click(p);
       if(p[1] < 50) { break; }
 
       screen_to_coords(Rtip, p);
@@ -1135,11 +1135,11 @@ int test01a()
 
       // draw ray
       ray_to_rgb (Rsource, Rtip, argb) ; 
-      G_rgb(argb[0], argb[1], argb[2]);
+      //G_rgb(argb[0], argb[1], argb[2]);
       ray_to_rgb (Rsource, Rtip, argb) ; 
     }
 
-    G_save_image_to_file("2d_Simple_Raymarcher.xwd") ;
+    //G_save_image_to_file("2d_Simple_Raymarcher.xwd") ;
 }
 
 
@@ -1167,9 +1167,16 @@ int test01b()
     // view matrix
     double origin[3] = {0,0,0};
 
-    //G_rgb(0, 0.1, 0);
-    G_rgb(0, 0, 0);
-    G_clear();
+    ////G_rgb(0, 0.1, 0);
+    //G_rgb(0, 0, 0);
+    //G_clear();
+
+    // clear the screen
+    for(int x=0; x<SCREEN_WIDTH; ++x) {
+    	for(int y=0; y<SCREEN_HEIGHT; ++y) {
+        set_xwd_map_color(id, x,y, 0.0, 0.0, 0.0);
+      }
+    }
 
     double p[2];
 
@@ -1177,10 +1184,11 @@ int test01b()
       screen_to_ray(Rtip, p);
 
       ray_to_rgb (Rsource, Rtip, argb) ; 
+		  int e = set_xwd_map_color(id, p[0], p[1],  argb[0], argb[1], argb[2]);
 
-      G_rgb(argb[0], argb[1], argb[2]);
-      G_point(p[0], p[1]);
-      G_display_image();
+      //G_rgb(argb[0], argb[1], argb[2]);
+      //G_point(p[0], p[1]);
+      //G_display_image();
     }
 
     // first frame, raytrace the whole plane
@@ -1200,10 +1208,11 @@ int test01b()
     }
 
     printf("finished render\n");
-    G_save_image_to_file("2d_Simple_Raymarcher.xwd") ;
+    xwd_map_to_named_xwd_file(id, "9sphere_spherical_lightmodel.xwd");
+    //G_save_image_to_file("2d_Simple_Raymarcher.xwd") ;
 
     while(1) {
-      G_wait_click(p);
+      //G_wait_click(p);
       if(p[1] < 50) { break; }
 
       render_point();
@@ -1238,6 +1247,8 @@ int main()
   phi_grad = sphere_phi_grad;
   */
 
-  G_init_graphics(800,800);
+  //G_init_graphics(800,800);
+  id = create_new_xwd_map(SCREEN_WIDTH, SCREEN_HEIGHT);
+  if(id == -1) { printf("failure!\n"); exit(0); }
   test01a() ;
 }
