@@ -217,7 +217,7 @@ int get_color(int onum, double P[2], double rgb[3])
 
 
 double delta_t = 0.0001;
-double max_ray_distance = 200000;
+double max_ray_distance = 100000;
 
 int cast_ray(double Rsource[3], double Rtip[3], double point[3], double V[3])
 {
@@ -675,6 +675,9 @@ int ray_to_rgb_recursive(double Rsource[3], double Rtip[3], double argb[3], int 
   int saved_onum = cast_ray(Rsource, Rtip, point, look);
   if(saved_onum == -1) {
     // no intersection
+    if(debug) {
+      G_rgb(0,0,0);
+    }
     return 0;
   }
 
