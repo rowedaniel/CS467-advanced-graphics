@@ -1,4 +1,4 @@
-#include "3sphere_blackhole.c"
+#include "blackhole_scenario.c"
 
 int main()
 {
@@ -11,7 +11,7 @@ int main()
   delta_t = 0.003;
   max_ray_distance = 20000;
 
-  res = 3;
+  res = 1;
 
 
 
