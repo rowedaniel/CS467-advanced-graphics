@@ -290,7 +290,11 @@ int M3d_vector_add(double res[3], double a[3], double b[3]) {
 
 int M3d_normalize(double res[3], double a[3]) {
 	double magnitude = M3d_magnitude(a);
+  if(magnitude == 0) {
+    return 0;
+  }
 	M3d_vector_mult_const(res, a, 1/magnitude);
+  return 1;
 }
 
 
