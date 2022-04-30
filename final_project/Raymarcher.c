@@ -5,7 +5,7 @@
 
 #define M_HITHER 0.001
 #define M_YON 2000
-#define M 1000
+#define M 2000
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
 #define SIMPLE_COLOR 0

@@ -2,9 +2,12 @@
 
 double dist = 6;
 int res = 5;
-int gridSize = 28;
+int gridSize = 40;
 int y_grid = -1;
 int id;
+
+int fnum = 0;
+double move_per_frame = 1;
 
 int build_scene(double eye[3], double coi[3], double up[3]) {
     double Tvlist[100];
@@ -46,12 +49,35 @@ int build_scene(double eye[3], double coi[3], double up[3]) {
         num_objects++ ; // don't forget to do this
       }
     }
+    // build black hole itself (speeds up rendering)
+    color[num_objects][0] = 1;
+    color[num_objects][1] = 1;
+    color[num_objects][2] = 1;
+
+    color_type[num_objects] = SIMPLE_COLOR;
+    reflectivity[num_objects] = 0.0;
+  
+    Tn = 0 ;
+    Ttypelist[Tn] = SX ; Tvlist[Tn] =  0.98       ; Tn++ ;
+    Ttypelist[Tn] = SY ; Tvlist[Tn] =  0.98       ; Tn++ ;
+    Ttypelist[Tn] = SZ ; Tvlist[Tn] =  0.98       ; Tn++ ;
+  
+    M3d_make_movement_sequence_matrix(m, mi, Tn, Ttypelist, Tvlist);
+    M3d_copy_mat(obmat[num_objects], m);
+    M3d_copy_mat(obinv[num_objects], mi) ;
+
+    SDF[num_objects] = sphere_SDF;
+    grad[num_objects] = sphere_grad;
+    to_parametric[num_objects] = sphere_to_parametric;
+
+    draw[num_objects] = Draw_ellipsoid; // for 2d
+    num_objects++ ; // don't forget to do this
     //////////////////////////////////////////////////////////////
 
     // place camera
     eye[0] = -20;
     eye[1] = 0;
-    eye[2] = 0;
+    eye[2] = move_per_frame * fnum;
 
     coi[0] = 0;
     coi[1] = 0;
@@ -231,7 +257,10 @@ int do_3d()
 
     printf("finished render\n");
     //save_image_to_file("Raymarcher.xwd") ;
-    xwd_map_to_named_xwd_file(id, "blackhole_render.xwd");
+
+    char filename[100];
+    sprintf(filename, "blackhole_render%04d.xwd", fnum);
+    xwd_map_to_named_xwd_file(id, filename);
 
 
 }
